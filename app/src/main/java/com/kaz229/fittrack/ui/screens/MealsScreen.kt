@@ -23,18 +23,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.kaz229.fittrack.data.MacroGoals
+import com.kaz229.fittrack.data.MacroTotals
 import com.kaz229.fittrack.data.Meal
 import com.kaz229.fittrack.data.MealType
+import com.kaz229.fittrack.ui.formatGrams
 
 @Composable
 fun MealsScreen(
     meals: List<Meal>,
+    macros: MacroTotals,
+    macroGoals: MacroGoals,
     onDelete: (Meal) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (meals.isEmpty()) {
         EmptyState(
-            message = "Aucun repas aujourd'hui.\nAppuie sur + pour ajouter ce que tu as mangé.",
+            message = "Aucun repas aujourd'hui.\n" +
+                "Scanne un code-barres, ou saisis l'aliment à la main.",
             modifier = modifier,
         )
         return
@@ -42,15 +48,27 @@ fun MealsScreen(
     val total = meals.sumOf { it.calories }
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(16.dp),
+        // Marge basse dégagée : les deux boutons flottants (saisie et scan) recouvrent
+        // sinon la dernière ligne du journal.
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 104.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text(
-                text = "Total du jour : $total kcal",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "Total du jour : $total kcal",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    MacroGoalsBlock(totals = macros, goals = macroGoals)
+                }
+            }
         }
         items(meals, key = { it.id }) { meal ->
             MealCard(meal = meal, onDelete = { onDelete(meal) })
@@ -74,9 +92,21 @@ private fun MealCard(meal: Meal, onDelete: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "${MealType.byId(meal.mealType).label} · ${meal.calories} kcal",
+                    text = buildString {
+                        append(MealType.byId(meal.mealType).label)
+                        meal.grams?.let { append(" · ${formatGrams(it)}") }
+                        append(" · ${meal.calories} kcal")
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                if (meal.hasMacros) {
+                    Text(
+                        text = "P ${formatGrams(meal.proteinG)} · " +
+                            "G ${formatGrams(meal.carbsG)} · " +
+                            "L ${formatGrams(meal.fatG)}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = "Supprimer le repas")

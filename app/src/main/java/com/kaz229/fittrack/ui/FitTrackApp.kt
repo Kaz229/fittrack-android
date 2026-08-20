@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -48,6 +49,7 @@ import com.kaz229.fittrack.ui.screens.ExercisesScreen
 import com.kaz229.fittrack.ui.screens.HomeScreen
 import com.kaz229.fittrack.ui.screens.MealsScreen
 import com.kaz229.fittrack.ui.screens.ProfileScreen
+import com.kaz229.fittrack.ui.screens.ScanScreen
 import com.kaz229.fittrack.ui.screens.SessionDetailScreen
 import com.kaz229.fittrack.ui.screens.SessionsScreen
 
@@ -66,6 +68,7 @@ private enum class Tab(
 private const val SESSION_DETAIL = "session"
 private const val EXERCISE_DETAIL = "exercise"
 private const val PROFILE = "profile"
+private const val SCAN = "scan"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +90,8 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val setCountToday by viewModel.todaySetCount.collectAsStateWithLifecycle()
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
     val meals by viewModel.todayMeals.collectAsStateWithLifecycle()
+    val macros by viewModel.todayMacros.collectAsStateWithLifecycle()
+    val scanState by viewModel.scan.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val exercisesById by viewModel.exercisesById.collectAsStateWithLifecycle()
     val openSession by viewModel.openSession.collectAsStateWithLifecycle()
@@ -98,6 +103,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
         SESSION_DETAIL -> "Séance"
         EXERCISE_DETAIL -> "Exercice"
         PROFILE -> "Profil"
+        SCAN -> "Scanner un produit"
         else -> currentTab?.label ?: "FitTrack"
     }
 
@@ -158,8 +164,21 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                         text = { Text("Séance salle") },
                     )
                 }
-                Tab.MEALS -> FloatingActionButton(onClick = { showMealDialog = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Ajouter un repas")
+                Tab.MEALS -> Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SmallFloatingActionButton(onClick = { showMealDialog = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Saisir un aliment à la main")
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            viewModel.resetScan()
+                            navController.navigate(SCAN)
+                        },
+                        icon = { Icon(Icons.Filled.QrCodeScanner, contentDescription = null) },
+                        text = { Text("Scanner") },
+                    )
                 }
                 else -> Unit
             }
@@ -174,6 +193,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                 HomeScreen(
                     summary = summary,
                     profile = profile,
+                    macros = macros,
                     lastWeek = lastWeek,
                     volumeToday = volumeToday,
                     setCountToday = setCountToday,
@@ -202,7 +222,27 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                 )
             }
             composable(Tab.MEALS.route) {
-                MealsScreen(meals = meals, onDelete = viewModel::deleteMeal)
+                MealsScreen(
+                    meals = meals,
+                    macros = macros,
+                    macroGoals = profile.macroGoals,
+                    onDelete = viewModel::deleteMeal,
+                )
+            }
+            composable(SCAN) {
+                ScanScreen(
+                    state = scanState,
+                    onBarcode = viewModel::onBarcodeScanned,
+                    onConfirm = { grams, mealType ->
+                        viewModel.addScannedFood(grams, mealType)
+                        navController.popBackStack()
+                    },
+                    onRetry = viewModel::resetScan,
+                    onManualEntry = {
+                        navController.popBackStack()
+                        showMealDialog = true
+                    },
+                )
             }
             composable(SESSION_DETAIL) {
                 SessionDetailScreen(
@@ -227,9 +267,10 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
             composable(PROFILE) {
                 ProfileScreen(
                     profile = profile,
-                    onSave = { weight, goal ->
+                    onSave = { weight, goal, macroGoals ->
                         viewModel.setWeight(weight)
                         viewModel.setDailyCalorieGoal(goal)
+                        viewModel.setMacroGoals(macroGoals)
                     },
                 )
             }
@@ -248,8 +289,8 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     if (showMealDialog) {
         AddMealDialog(
             onDismiss = { showMealDialog = false },
-            onConfirm = { name, calories, mealType ->
-                viewModel.addMeal(name, calories, mealType)
+            onConfirm = { name, calories, mealType, protein, carbs, fat ->
+                viewModel.addMeal(name, calories, mealType, protein, carbs, fat)
                 showMealDialog = false
             },
         )

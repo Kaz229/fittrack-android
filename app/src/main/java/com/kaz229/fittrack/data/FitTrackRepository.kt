@@ -15,8 +15,10 @@ class FitTrackRepository(
     private val sessionDao: SessionDao,
     private val exerciseSetDao: ExerciseSetDao,
     private val mealDao: MealDao,
+    private val foodProductDao: FoodProductDao,
     private val userPreferences: UserPreferences,
     val exercises: ExerciseCatalog,
+    private val openFoodFacts: OpenFoodFactsClient = OpenFoodFactsClient(),
 ) {
 
     val profile: Flow<UserProfile> = userPreferences.profile
@@ -121,10 +123,14 @@ class FitTrackRepository(
 
     fun mealsForDay(date: LocalDate): Flow<List<Meal>> = mealDao.observeForDay(date.toEpochDay())
 
+    /** Saisie libre : plat maison ou produit absent d'Open Food Facts. Macros optionnelles. */
     suspend fun addMeal(
         name: String,
         calories: Int,
         mealType: MealType,
+        proteinG: Double = 0.0,
+        carbsG: Double = 0.0,
+        fatG: Double = 0.0,
         date: LocalDate = LocalDate.now(),
     ) {
         mealDao.insert(
@@ -133,13 +139,63 @@ class FitTrackRepository(
                 calories = calories,
                 mealType = mealType.id,
                 epochDay = date.toEpochDay(),
+                proteinG = proteinG,
+                carbsG = carbsG,
+                fatG = fatG,
             ),
         )
     }
 
     suspend fun deleteMeal(meal: Meal) = mealDao.delete(meal)
 
+    // --- Aliments scannés ----------------------------------------------------
+
+    /**
+     * Cherche un code-barres : cache local d'abord, réseau ensuite.
+     *
+     * Le cache évite de retomber sur la limite d'Open Food Facts (15 requêtes par
+     * minute) et rend un produit déjà scanné utilisable sans réseau.
+     */
+    suspend fun lookupFood(barcode: String, today: LocalDate = LocalDate.now()): FoodLookup {
+        foodProductDao.findByBarcode(barcode)?.let {
+            return FoodLookup.Found(it, fromCache = true)
+        }
+        val result = openFoodFacts.fetch(barcode)
+        if (result is FoodLookup.Found) {
+            val product = result.product.copy(fetchedAtEpochDay = today.toEpochDay())
+            foodProductDao.upsert(product)
+            return FoodLookup.Found(product, fromCache = false)
+        }
+        return result
+    }
+
+    /** Enregistre une portion pesée d'un produit scanné, macros calculées au prorata. */
+    suspend fun addFoodMeal(
+        product: FoodProduct,
+        grams: Double,
+        mealType: MealType,
+        date: LocalDate = LocalDate.now(),
+    ) {
+        val portion = product.portion(grams)
+        mealDao.insert(
+            Meal(
+                name = product.displayName,
+                calories = portion.calories,
+                mealType = mealType.id,
+                epochDay = date.toEpochDay(),
+                proteinG = portion.proteinG,
+                carbsG = portion.carbsG,
+                fatG = portion.fatG,
+                barcode = product.barcode,
+                grams = grams,
+            ),
+        )
+    }
+
     // --- Bilans --------------------------------------------------------------
+
+    fun macrosForDay(date: LocalDate): Flow<MacroTotals> =
+        mealDao.observeMacrosForDay(date.toEpochDay())
 
     fun summaryForDay(date: LocalDate): Flow<DailySummary> {
         val day = date.toEpochDay()
@@ -177,6 +233,8 @@ class FitTrackRepository(
 
     suspend fun setDailyCalorieGoal(goal: Int) = userPreferences.setDailyCalorieGoal(goal)
 
+    suspend fun setMacroGoals(goals: MacroGoals) = userPreferences.setMacroGoals(goals)
+
     companion object {
         @Volatile
         private var instance: FitTrackRepository? = null
@@ -188,6 +246,7 @@ class FitTrackRepository(
                     sessionDao = db.sessionDao(),
                     exerciseSetDao = db.exerciseSetDao(),
                     mealDao = db.mealDao(),
+                    foodProductDao = db.foodProductDao(),
                     userPreferences = UserPreferences(context.applicationContext),
                     exercises = ExerciseCatalog.get(context),
                 ).also { instance = it }

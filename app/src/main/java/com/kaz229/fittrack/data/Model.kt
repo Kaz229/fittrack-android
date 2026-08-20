@@ -63,7 +63,14 @@ data class ExerciseSet(
     val volume: Double get() = reps * weightKg
 }
 
-/** Un repas ou une collation, avec les calories ingérées. */
+/**
+ * Une ligne du journal alimentaire : un aliment ou un plat, ses calories et ses macros.
+ *
+ * Un « repas » au sens courant est l'ensemble des lignes qui partagent le même
+ * [mealType] sur la même journée — pas besoin d'une table de regroupement.
+ * [barcode] et [grams] ne sont renseignés que pour un produit scanné ; une saisie
+ * libre les laisse à null et peut n'avoir que des calories.
+ */
 @Entity(tableName = "meals")
 data class Meal(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -71,7 +78,15 @@ data class Meal(
     val calories: Int,
     val mealType: String,
     val epochDay: Long,
-)
+    val proteinG: Double = 0.0,
+    val carbsG: Double = 0.0,
+    val fatG: Double = 0.0,
+    val barcode: String? = null,
+    val grams: Double? = null,
+) {
+    /** Vrai dès qu'au moins une macro est connue : sert à ne pas afficher « 0 g » partout. */
+    val hasMacros: Boolean get() = proteinG > 0 || carbsG > 0 || fatG > 0
+}
 
 /** Bilan d'une journée : ingéré, brûlé, et solde net. */
 data class DailySummary(

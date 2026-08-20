@@ -3,6 +3,7 @@ package com.kaz229.fittrack.data
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
@@ -89,4 +90,23 @@ interface MealDao {
             "WHERE epochDay >= :fromDay GROUP BY epochDay",
     )
     fun observeDailyTotals(fromDay: Long): Flow<List<DayTotal>>
+
+    /** Somme des macros de la journée, en grammes. */
+    @Query(
+        "SELECT COALESCE(SUM(proteinG), 0.0) AS proteinG, " +
+            "COALESCE(SUM(carbsG), 0.0) AS carbsG, " +
+            "COALESCE(SUM(fatG), 0.0) AS fatG " +
+            "FROM meals WHERE epochDay = :epochDay",
+    )
+    fun observeMacrosForDay(epochDay: Long): Flow<MacroTotals>
+}
+
+/** Cache local des produits Open Food Facts déjà scannés. */
+@Dao
+interface FoodProductDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(product: FoodProduct)
+
+    @Query("SELECT * FROM food_products WHERE barcode = :barcode")
+    suspend fun findByBarcode(barcode: String): FoodProduct?
 }
