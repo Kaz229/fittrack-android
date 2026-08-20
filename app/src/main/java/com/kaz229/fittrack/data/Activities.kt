@@ -3,7 +3,7 @@ package com.kaz229.fittrack.data
 import kotlin.math.roundToInt
 
 /**
- * Catalogue d'activités avec leur MET (Metabolic Equivalent of Task),
+ * Activité cardio ou sport, avec son MET (Metabolic Equivalent of Task),
  * valeurs issues du Compendium of Physical Activities.
  */
 data class ActivityType(
@@ -13,17 +13,26 @@ data class ActivityType(
 )
 
 object Activities {
+
+    /** MET de la musculation : sert à estimer les calories d'une séance salle. */
+    val strengthTraining = ActivityType("muscu", "Musculation", 5.0)
+
+    /** Activités proposées pour une séance cardio / sport (hors salle de muscu). */
     val all = listOf(
-        ActivityType("football", "Football", 7.0),
-        ActivityType("course", "Course à pied", 9.8),
-        ActivityType("marche", "Marche rapide", 4.3),
-        ActivityType("velo", "Vélo", 7.5),
-        ActivityType("natation", "Natation", 8.3),
-        ActivityType("muscu", "Musculation", 5.0),
+        ActivityType("tapis", "Tapis de course", 9.0),
+        ActivityType("velo_appart", "Vélo d'appartement", 7.0),
+        ActivityType("rameur", "Rameur", 7.0),
+        ActivityType("elliptique", "Elliptique", 5.0),
+        ActivityType("corde", "Corde à sauter", 11.0),
         ActivityType("hiit", "HIIT / Cross-training", 8.0),
+        ActivityType("course", "Course à pied (extérieur)", 9.8),
+        ActivityType("marche", "Marche rapide", 4.3),
+        ActivityType("natation", "Natation", 8.3),
+        ActivityType("football", "Football", 7.0),
         ActivityType("basket", "Basket", 6.5),
-        ActivityType("tennis", "Tennis", 7.3),
-        ActivityType("yoga", "Yoga / Étirements", 2.5),
+        ActivityType("velo", "Vélo (extérieur)", 7.5),
+        ActivityType("etirements", "Étirements / mobilité", 2.5),
+        strengthTraining,
         ActivityType("autre", "Autre", 5.0),
     )
 

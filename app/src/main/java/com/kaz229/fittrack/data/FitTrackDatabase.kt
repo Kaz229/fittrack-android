@@ -5,9 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Workout::class, Meal::class], version = 1, exportSchema = false)
+@Database(
+    entities = [Session::class, ExerciseSet::class, Meal::class],
+    version = 1,
+    exportSchema = false,
+)
 abstract class FitTrackDatabase : RoomDatabase() {
-    abstract fun workoutDao(): WorkoutDao
+    abstract fun sessionDao(): SessionDao
+    abstract fun exerciseSetDao(): ExerciseSetDao
     abstract fun mealDao(): MealDao
 
     companion object {

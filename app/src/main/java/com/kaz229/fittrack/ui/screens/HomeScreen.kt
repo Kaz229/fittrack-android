@@ -19,9 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kaz229.fittrack.data.DailySummary
 import com.kaz229.fittrack.data.UserProfile
-import java.time.LocalDate
-import java.time.format.TextStyle
-import java.util.Locale
+import com.kaz229.fittrack.ui.formatDay
+import com.kaz229.fittrack.ui.formatVolume
 import kotlin.math.abs
 
 @Composable
@@ -29,6 +28,8 @@ fun HomeScreen(
     summary: DailySummary,
     profile: UserProfile,
     lastWeek: List<DailySummary>,
+    volumeToday: Double,
+    setCountToday: Int,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -38,6 +39,9 @@ fun HomeScreen(
     ) {
         item {
             TodayCard(summary = summary, goal = profile.dailyCalorieGoal)
+        }
+        item {
+            TrainingCard(volumeToday = volumeToday, setCountToday = setCountToday)
         }
         item {
             Text(
@@ -103,6 +107,34 @@ private fun TodayCard(summary: DailySummary, goal: Int) {
 }
 
 @Composable
+private fun TrainingCard(volumeToday: Double, setCountToday: Int) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Entraînement du jour", style = MaterialTheme.typography.titleMedium)
+            if (setCountToday == 0) {
+                Text(
+                    text = "Aucune série enregistrée aujourd'hui.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    StatColumn("Séries", setCountToday.toString())
+                    StatColumn("Volume soulevé", formatVolume(volumeToday))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun StatColumn(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, style = MaterialTheme.typography.labelMedium)
@@ -116,9 +148,7 @@ private fun StatColumn(label: String, value: String) {
 
 @Composable
 private fun WeekRow(day: DailySummary) {
-    val date = LocalDate.ofEpochDay(day.epochDay)
-    val label = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.FRENCH) +
-        " ${date.dayOfMonth}/${date.monthValue}"
+    val label = formatDay(day.epochDay)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
