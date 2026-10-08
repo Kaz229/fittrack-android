@@ -9,7 +9,11 @@ import com.kaz229.fittrack.data.ExerciseBlock
 import com.kaz229.fittrack.data.ExerciseCatalog
 import com.kaz229.fittrack.data.ExerciseSet
 import com.kaz229.fittrack.data.FitTrackRepository
+import com.kaz229.fittrack.data.FoodLookup
+import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.Labels
+import com.kaz229.fittrack.data.MacroGoals
+import com.kaz229.fittrack.data.MacroTotals
 import com.kaz229.fittrack.data.Meal
 import com.kaz229.fittrack.data.MealType
 import com.kaz229.fittrack.data.Session
@@ -36,6 +40,24 @@ data class CatalogState(
     val equipment: String? = null,
     val loading: Boolean = true,
 )
+
+/** Pourquoi un code-barres scanné n'a rien donné. */
+enum class ScanError { NOT_FOUND, NO_NUTRITION, NETWORK }
+
+/**
+ * État de l'écran de scan. Tant que [product] est null et qu'aucune [error] n'est
+ * remontée, la caméra reste active et cherche un code-barres.
+ */
+data class ScanState(
+    val searching: Boolean = false,
+    val barcode: String? = null,
+    val product: FoodProduct? = null,
+    val fromCache: Boolean = false,
+    val error: ScanError? = null,
+) {
+    /** La caméra doit s'arrêter dès qu'un code a été capté, succès ou échec. */
+    val cameraActive: Boolean get() = !searching && product == null && error == null
+}
 
 /** La fiche d'un exercice : sa description et ce que l'utilisateur y a déjà fait. */
 data class ExerciseDetail(
@@ -142,6 +164,44 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
         openSessionId.value?.let { repository.finishGymSession(it, durationMinutes, note) }
     }
 
+    // --- Scan d'un code-barres alimentaire -----------------------------------
+
+    private val _scan = MutableStateFlow(ScanState())
+    val scan: StateFlow<ScanState> = _scan
+
+    /**
+     * Appelé par l'analyseur d'images à chaque code-barres reconnu. La caméra en
+     * envoie plusieurs par seconde : on ignore tout ce qui arrive dès qu'une
+     * recherche est lancée, sinon on épuiserait le quota d'Open Food Facts.
+     */
+    fun onBarcodeScanned(barcode: String) {
+        if (!_scan.value.cameraActive) return
+        _scan.value = ScanState(searching = true, barcode = barcode)
+        viewModelScope.launch {
+            _scan.value = when (val result = repository.lookupFood(barcode, today)) {
+                is FoodLookup.Found -> ScanState(
+                    barcode = barcode,
+                    product = result.product,
+                    fromCache = result.fromCache,
+                )
+                FoodLookup.NotFound -> ScanState(barcode = barcode, error = ScanError.NOT_FOUND)
+                FoodLookup.NoNutrition ->
+                    ScanState(barcode = barcode, error = ScanError.NO_NUTRITION)
+                FoodLookup.NetworkError -> ScanState(barcode = barcode, error = ScanError.NETWORK)
+            }
+        }
+    }
+
+    /** Remet la caméra en recherche : nouveau scan, ou abandon de l'écran. */
+    fun resetScan() { _scan.value = ScanState() }
+
+    /** Enregistre la portion pesée du produit scanné, puis libère l'écran de scan. */
+    fun addScannedFood(grams: Double, mealType: MealType) = viewModelScope.launch {
+        val product = _scan.value.product ?: return@launch
+        repository.addFoodMeal(product, grams, mealType, today)
+        _scan.value = ScanState()
+    }
+
     // --- Séances, repas, bilans ---------------------------------------------
 
     val profile: StateFlow<UserProfile> = repository.profile
@@ -169,6 +229,9 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
     val todayMeals: StateFlow<List<Meal>> = repository.mealsForDay(today)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val todayMacros: StateFlow<MacroTotals> = repository.macrosForDay(today)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MacroTotals())
+
     fun addCardioSession(activityId: String, durationMinutes: Int, note: String) =
         viewModelScope.launch {
             repository.addCardioSession(activityId, durationMinutes, note, today)
@@ -178,8 +241,15 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
         repository.deleteSession(session)
     }
 
-    fun addMeal(name: String, calories: Int, mealType: MealType) = viewModelScope.launch {
-        repository.addMeal(name, calories, mealType, today)
+    fun addMeal(
+        name: String,
+        calories: Int,
+        mealType: MealType,
+        proteinG: Double = 0.0,
+        carbsG: Double = 0.0,
+        fatG: Double = 0.0,
+    ) = viewModelScope.launch {
+        repository.addMeal(name, calories, mealType, proteinG, carbsG, fatG, today)
     }
 
     fun deleteMeal(meal: Meal) = viewModelScope.launch { repository.deleteMeal(meal) }
@@ -188,5 +258,9 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
 
     fun setDailyCalorieGoal(goal: Int) = viewModelScope.launch {
         repository.setDailyCalorieGoal(goal)
+    }
+
+    fun setMacroGoals(goals: MacroGoals) = viewModelScope.launch {
+        repository.setMacroGoals(goals)
     }
 }
