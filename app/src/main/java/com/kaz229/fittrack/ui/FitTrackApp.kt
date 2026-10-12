@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,7 +59,7 @@ private enum class Tab(
 ) {
     HOME("home", "Accueil", Icons.Filled.Home),
     SESSIONS("sessions", "Séances", Icons.Filled.FitnessCenter),
-    EXERCISES("exercises", "Exercices", Icons.Filled.MenuBook),
+    EXERCISES("exercises", "Exercices", Icons.AutoMirrored.Filled.MenuBook),
     MEALS("meals", "Repas", Icons.Filled.Restaurant),
 }
 
