@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kaz229.fittrack.data.DailySummary
+import com.kaz229.fittrack.data.MacroTotals
 import com.kaz229.fittrack.data.UserProfile
 import com.kaz229.fittrack.ui.formatDay
 import com.kaz229.fittrack.ui.formatVolume
@@ -27,6 +28,7 @@ import kotlin.math.abs
 fun HomeScreen(
     summary: DailySummary,
     profile: UserProfile,
+    macros: MacroTotals,
     lastWeek: List<DailySummary>,
     volumeToday: Double,
     setCountToday: Int,
@@ -39,6 +41,9 @@ fun HomeScreen(
     ) {
         item {
             TodayCard(summary = summary, goal = profile.dailyCalorieGoal)
+        }
+        item {
+            MacrosCard(macros = macros, profile = profile)
         }
         item {
             TrainingCard(volumeToday = volumeToday, setCountToday = setCountToday)
@@ -102,6 +107,21 @@ private fun TodayCard(summary: DailySummary, goal: Int) {
                 StatColumn("Brûlé", "${summary.caloriesOut} kcal")
                 StatColumn("Objectif", "$goal kcal")
             }
+        }
+    }
+}
+
+@Composable
+private fun MacrosCard(macros: MacroTotals, profile: UserProfile) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Macros du jour", style = MaterialTheme.typography.titleMedium)
+            MacroGoalsBlock(totals = macros, goals = profile.macroGoals)
         }
     }
 }

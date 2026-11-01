@@ -13,6 +13,14 @@ fun formatWeight(weightKg: Double): String =
         String.format(Locale.FRENCH, "%.1f kg", weightKg)
     }
 
+/** « 12,5 g » mais « 12 g » : mêmes règles que les poids, pour les macros et les portions. */
+fun formatGrams(grams: Double): String =
+    if (grams % 1.0 == 0.0) {
+        "${grams.toInt()} g"
+    } else {
+        String.format(Locale.FRENCH, "%.1f g", grams)
+    }
+
 /** Le volume se compte vite en tonnes : au-delà de 1000 kg on bascule. */
 fun formatVolume(volumeKg: Double): String = when {
     volumeKg >= 1000 -> String.format(Locale.FRENCH, "%.1f t", volumeKg / 1000)

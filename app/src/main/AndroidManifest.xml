@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Scan des codes-barres alimentaires. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Interrogation d'Open Food Facts : seul le code-barres scanné sort du téléphone. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

@@ -21,12 +21,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.kaz229.fittrack.data.MacroGoals
 import com.kaz229.fittrack.data.UserProfile
 
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
-    onSave: (weightKg: Double, goal: Int) -> Unit,
+    onSave: (weightKg: Double, goal: Int, macroGoals: MacroGoals) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var weight by remember(profile.weightKg) {
@@ -35,10 +36,26 @@ fun ProfileScreen(
     var goal by remember(profile.dailyCalorieGoal) {
         mutableStateOf(profile.dailyCalorieGoal.toString())
     }
+    var protein by remember(profile.macroGoals.proteinG) {
+        mutableStateOf(profile.macroGoals.proteinG.toString())
+    }
+    var carbs by remember(profile.macroGoals.carbsG) {
+        mutableStateOf(profile.macroGoals.carbsG.toString())
+    }
+    var fat by remember(profile.macroGoals.fatG) {
+        mutableStateOf(profile.macroGoals.fatG.toString())
+    }
 
     val parsedWeight = weight.replace(',', '.').toDoubleOrNull()
     val parsedGoal = goal.toIntOrNull()
-    val valid = parsedWeight != null && parsedWeight > 0 && parsedGoal != null && parsedGoal > 0
+    val parsedProtein = protein.toIntOrNull()
+    val parsedCarbs = carbs.toIntOrNull()
+    val parsedFat = fat.toIntOrNull()
+    val valid = parsedWeight != null && parsedWeight > 0 &&
+        parsedGoal != null && parsedGoal > 0 &&
+        parsedProtein != null && parsedProtein > 0 &&
+        parsedCarbs != null && parsedCarbs > 0 &&
+        parsedFat != null && parsedFat > 0
 
     Column(
         modifier = modifier
@@ -68,8 +85,46 @@ fun ProfileScreen(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
+        Text(
+            text = "Objectifs de macros (grammes par jour)",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        OutlinedTextField(
+            value = protein,
+            onValueChange = { protein = it },
+            label = { Text("Protéines (g)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = carbs,
+            onValueChange = { carbs = it },
+            label = { Text("Glucides (g)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = fat,
+            onValueChange = { fat = it },
+            label = { Text("Lipides (g)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+        )
         Button(
-            onClick = { onSave(parsedWeight ?: profile.weightKg, parsedGoal ?: profile.dailyCalorieGoal) },
+            onClick = {
+                onSave(
+                    parsedWeight ?: profile.weightKg,
+                    parsedGoal ?: profile.dailyCalorieGoal,
+                    MacroGoals(
+                        proteinG = parsedProtein ?: profile.macroGoals.proteinG,
+                        carbsG = parsedCarbs ?: profile.macroGoals.carbsG,
+                        fatG = parsedFat ?: profile.macroGoals.fatG,
+                    ),
+                )
+            },
             enabled = valid,
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -86,6 +141,15 @@ fun ProfileScreen(
                         "kcal = MET × 3,5 × poids(kg) ÷ 200 × durée(min). " +
                         "Chaque sport a son propre MET (course 9,8 ; football 7,0 ; yoga 2,5…). " +
                         "C'est une estimation, pas une mesure médicale.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("D'où viennent les valeurs nutritionnelles ?", fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "Les produits scannés sont cherchés dans Open Food Facts, une base " +
+                        "de données alimentaire ouverte et collaborative. Seul le code-barres " +
+                        "quitte le téléphone ; le produit est ensuite gardé en cache local. " +
+                        "Les valeurs sont renseignées par des contributeurs : elles peuvent " +
+                        "être incomplètes ou erronées.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
