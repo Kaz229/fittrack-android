@@ -25,8 +25,16 @@ data class FoodProduct(
     val servingSizeG: Double? = null,
     val fetchedAtEpochDay: Long = 0,
 ) {
-    /** « Nutella — Ferrero », ou juste le nom quand la marque est inconnue. */
-    val displayName: String get() = if (brands.isBlank()) name else "$name — $brands"
+    /**
+     * « Nutella — Ferrero », ou juste le nom quand la marque est inconnue — ou déjà
+     * contenue dans le nom, ce qui donnerait « Nutella — Nutella ».
+     */
+    val displayName: String
+        get() = if (brands.isBlank() || name.contains(brands, ignoreCase = true)) {
+            name
+        } else {
+            "$name — $brands"
+        }
 }
 
 /** Les valeurs d'une portion : ce qui finit réellement enregistré dans le journal. */
@@ -87,5 +95,29 @@ fun parseServingGrams(raw: String?): Double? {
     val value = match?.groupValues?.get(1)?.replace(',', '.')?.toDoubleOrNull() ?: return null
     return value.takeIf { it > 0 }
 }
+
+/**
+ * Vérifie qu'une suite de chiffres est un code-barres alimentaire plausible.
+ *
+ * Les formats EAN-13, EAN-8, UPC-A et UPC-E portent une clé de contrôle en dernier
+ * chiffre : la valider évite d'interroger Open Food Facts pour une faute de frappe,
+ * et distingue un vrai code d'un numéro saisi de travers.
+ */
+fun isValidBarcode(raw: String): Boolean {
+    val digits = raw.trim()
+    if (digits.length !in VALID_BARCODE_LENGTHS) return false
+    if (!digits.all { it.isDigit() }) return false
+
+    // Somme pondérée 3/1 en partant de l'avant-dernier chiffre, quelle que soit la longueur.
+    val body = digits.dropLast(1)
+    val sum = body.reversed().mapIndexed { index, char ->
+        val value = Character.getNumericValue(char)
+        if (index % 2 == 0) value * 3 else value
+    }.sum()
+    val expected = (10 - sum % 10) % 10
+    return expected == Character.getNumericValue(digits.last())
+}
+
+private val VALID_BARCODE_LENGTHS = setOf(8, 12, 13)
 
 private fun round1(value: Double): Double = (value * 10).roundToInt() / 10.0

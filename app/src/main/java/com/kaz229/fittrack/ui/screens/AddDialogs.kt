@@ -32,6 +32,7 @@ import com.kaz229.fittrack.data.Exercise
 import com.kaz229.fittrack.data.ExerciseSet
 import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.MealType
+import com.kaz229.fittrack.data.isValidBarcode
 import com.kaz229.fittrack.data.portion
 
 /**
@@ -181,6 +182,54 @@ fun AddCardioDialog(
                 onClick = { onConfirm(activityId, parsedDuration ?: 0, note.trim()) },
                 enabled = parsedDuration != null && parsedDuration > 0,
             ) { Text("Ajouter") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
+    )
+}
+
+/**
+ * Saisie du code-barres au clavier, quand la caméra ne peut pas lire l'étiquette :
+ * emballage abîmé, reflet, produit déjà jeté, ou simple manque de lumière.
+ */
+@Composable
+fun ManualBarcodeDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (barcode: String) -> Unit,
+) {
+    var code by remember { mutableStateOf("") }
+    val trimmed = code.trim()
+    val valid = isValidBarcode(trimmed)
+    // On ne crie pas à l'erreur pendant la frappe des premiers chiffres.
+    val showError = trimmed.length >= 8 && !valid
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Entrer le code-barres") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Les chiffres imprimés sous le code-barres, sans espace " +
+                        "(8, 12 ou 13 chiffres).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { entry -> code = entry.filter { it.isDigit() } },
+                    label = { Text("Code-barres") },
+                    singleLine = true,
+                    isError = showError,
+                    supportingText = if (showError) {
+                        { Text("Ce code semble incorrect : vérifie les chiffres.") }
+                    } else {
+                        null
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(trimmed) }, enabled = valid) { Text("Chercher") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
     )

@@ -4,9 +4,11 @@ import com.kaz229.fittrack.data.FoodLookup
 import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.MacroTotals
 import com.kaz229.fittrack.data.OpenFoodFactsClient
+import com.kaz229.fittrack.data.isValidBarcode
 import com.kaz229.fittrack.data.parseServingGrams
 import com.kaz229.fittrack.data.portion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -131,6 +133,37 @@ class NutritionTest {
     fun `un produit sans nom est inexploitable`() {
         val json = """{"product":{"nutriments":{"energy-kcal_100g":100}}}"""
         assertEquals(FoodLookup.NoNutrition, OpenFoodFactsClient.parseProduct("123", json))
+    }
+
+    @Test
+    fun `le nom affiche ne repete pas la marque`() {
+        assertEquals("Nutella", nutella.copy(brands = "Nutella").displayName)
+        assertEquals("Nutella — Ferrero", nutella.displayName)
+        assertEquals("Nutella", nutella.copy(brands = "").displayName)
+    }
+
+    @Test
+    fun `les vrais codes barres sont acceptes`() {
+        assertTrue(isValidBarcode("3017620422003")) // Nutella, EAN-13
+        assertTrue(isValidBarcode("5449000000996")) // Coca-Cola, EAN-13
+        assertTrue(isValidBarcode("96385074")) // EAN-8
+        assertTrue(isValidBarcode("036000291452")) // UPC-A
+        assertTrue(isValidBarcode(" 3017620422003 ")) // espaces tolérés
+    }
+
+    @Test
+    fun `un chiffre faux est detecte par la cle de controle`() {
+        // Un seul chiffre modifié : la saisie doit être refusée avant tout appel réseau.
+        assertFalse(isValidBarcode("3017620422004"))
+        assertFalse(isValidBarcode("3017620422013"))
+    }
+
+    @Test
+    fun `une saisie mal formee est refusee`() {
+        assertFalse(isValidBarcode(""))
+        assertFalse(isValidBarcode("123"))
+        assertFalse(isValidBarcode("30176204220031")) // 14 chiffres
+        assertFalse(isValidBarcode("30176204220O3")) // lettre O au lieu d'un zéro
     }
 
     @Test
