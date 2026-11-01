@@ -79,6 +79,17 @@ fun ScanScreen(
         )
     }
     var permissionRefused by remember { mutableStateOf(false) }
+    var showManualEntry by remember { mutableStateOf(false) }
+
+    if (showManualEntry) {
+        ManualBarcodeDialog(
+            onDismiss = { showManualEntry = false },
+            onConfirm = { barcode ->
+                showManualEntry = false
+                onBarcode(barcode)
+            },
+        )
+    }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -99,9 +110,11 @@ fun ScanScreen(
             } else {
                 "FitTrack a besoin de la caméra pour lire le code-barres des produits."
             },
-            actionLabel = "Saisir à la main",
-            onAction = onManualEntry,
+            actionLabel = "Entrer le code-barres",
+            onAction = { showManualEntry = true },
             modifier = modifier,
+            secondaryLabel = "Saisir l'aliment à la main",
+            onSecondary = onManualEntry,
         )
         return
     }
@@ -109,6 +122,18 @@ fun ScanScreen(
     Box(modifier = modifier.fillMaxSize()) {
         if (state.cameraActive) {
             CameraPreview(onBarcode = onBarcode, modifier = Modifier.fillMaxSize())
+            TextButton(
+                onClick = { showManualEntry = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(32.dp)
+                    .background(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(24.dp),
+                    ),
+            ) {
+                Text(text = "Entrer le code à la main", color = Color.White)
+            }
             Text(
                 text = "Cadre le code-barres du produit",
                 style = MaterialTheme.typography.bodyMedium,
@@ -159,8 +184,16 @@ fun ScanScreen(
                         "Impossible d'interroger Open Food Facts. Vérifie ta connexion, " +
                             "ou saisis l'aliment à la main."
                 },
-                actionLabel = "Saisir à la main",
-                onAction = onManualEntry,
+                actionLabel = if (state.error == ScanError.NOT_FOUND) {
+                    "Saisir l'aliment à la main"
+                } else {
+                    "Entrer le code-barres"
+                },
+                onAction = if (state.error == ScanError.NOT_FOUND) {
+                    onManualEntry
+                } else {
+                    { showManualEntry = true }
+                },
                 secondaryLabel = "Réessayer",
                 onSecondary = onRetry,
                 modifier = Modifier.align(Alignment.Center),
