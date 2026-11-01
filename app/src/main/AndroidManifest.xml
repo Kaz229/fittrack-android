@@ -10,6 +10,21 @@
         android:name="android.hardware.camera.any"
         android:required="false" />
 
+    <!--
+      Health Connect : échange des données d'entraînement et de nutrition avec les
+      autres applications santé du téléphone. Tout est facultatif — l'app reste
+      pleinement utilisable si l'utilisateur refuse, ou si Health Connect est absent.
+    -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.WRITE_NUTRITION" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+
+    <!-- Nécessaire pour détecter si Health Connect est installé (Android 11+). -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -27,6 +42,18 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Health Connect exige que l'app explique l'usage qu'elle fait des données
+              de santé, et ouvre cet écran depuis ses propres réglages.
+            -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity>
     </application>

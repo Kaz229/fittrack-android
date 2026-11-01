@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.concurrent.Executors
+import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanner
@@ -200,29 +201,26 @@ private fun CameraPreview(onBarcode: (String) -> Unit, modifier: Modifier = Modi
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
     LaunchedEffect(Unit) {
-        val future = ProcessCameraProvider.getInstance(context)
-        future.addListener({
-            val cameraProvider = future.get()
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            val analysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { imageAnalysis ->
-                    imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                        imageProxy.scanBarcode(scanner, onBarcode)
-                    }
+        val cameraProvider = ProcessCameraProvider.getInstance(context).await()
+        val preview = Preview.Builder().build().also {
+            it.setSurfaceProvider(previewView.surfaceProvider)
+        }
+        val analysis = ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+            .also { imageAnalysis ->
+                imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                    imageProxy.scanBarcode(scanner, onBarcode)
                 }
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                preview,
-                analysis,
-            )
-            provider = cameraProvider
-        }, ContextCompat.getMainExecutor(context))
+            }
+        cameraProvider.unbindAll()
+        cameraProvider.bindToLifecycle(
+            lifecycleOwner,
+            CameraSelector.DEFAULT_BACK_CAMERA,
+            preview,
+            analysis,
+        )
+        provider = cameraProvider
     }
 
     DisposableEffect(Unit) {

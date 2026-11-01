@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import com.kaz229.fittrack.data.UserProfile
 fun ProfileScreen(
     profile: UserProfile,
     onSave: (weightKg: Double, goal: Int, macroGoals: MacroGoals) -> Unit,
+    onOpenHealthConnect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var weight by remember(profile.weightKg) {
@@ -129,6 +131,12 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Enregistrer")
+        }
+        OutlinedButton(
+            onClick = onOpenHealthConnect,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Synchronisation Health Connect")
         }
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(

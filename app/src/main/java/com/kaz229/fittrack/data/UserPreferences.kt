@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -35,6 +36,7 @@ class UserPreferences(private val context: Context) {
     private val proteinGoalKey = intPreferencesKey("protein_goal_g")
     private val carbsGoalKey = intPreferencesKey("carbs_goal_g")
     private val fatGoalKey = intPreferencesKey("fat_goal_g")
+    private val lastHealthSyncKey = longPreferencesKey("last_health_sync_epoch_second")
 
     val profile: Flow<UserProfile> = context.dataStore.data.map { prefs ->
         UserProfile(
@@ -54,6 +56,13 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setDailyCalorieGoal(goal: Int) {
         context.dataStore.edit { it[goalKey] = goal }
+    }
+
+    /** Horodatage de la dernière synchronisation Health Connect réussie, en secondes. */
+    val lastHealthSync: Flow<Long?> = context.dataStore.data.map { it[lastHealthSyncKey] }
+
+    suspend fun setLastHealthSync(epochSecond: Long) {
+        context.dataStore.edit { it[lastHealthSyncKey] = epochSecond }
     }
 
     suspend fun setMacroGoals(goals: MacroGoals) {
