@@ -1,0 +1,130 @@
+package com.kaz229.fittrack.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.time.LocalDate
+
+/**
+ * Un repas déposé par un assistant sur Kazis, en attente de récupération.
+ *
+ * Deux formes : soit tout est renseigné (nom, calories, macros), soit seuls
+ * [barcode] et [grams] le sont — c'est alors à FitTrack de retrouver le produit
+ * chez Open Food Facts, avec le cache qu'il possède déjà.
+ */
+data class KazisMeal(
+    val id: Long,
+    val name: String,
+    val calories: Int,
+    val proteinG: Double,
+    val carbsG: Double,
+    val fatG: Double,
+    val mealType: MealType,
+    val day: LocalDate,
+    val barcode: String?,
+    val grams: Double?,
+) {
+    /** Un produit sans valeurs : il faut interroger Open Food Facts avant d'enregistrer. */
+    val needsLookup: Boolean get() = calories <= 0 && barcode != null && grams != null
+}
+
+/** Ce que la récupération a donné, pour l'afficher sans interpréter une exception. */
+sealed interface KazisFetch {
+    data class Success(val added: Int, val skipped: Int) : KazisFetch
+    data object NotConfigured : KazisFetch
+    data object Unauthorized : KazisFetch
+    data class Failed(val message: String) : KazisFetch
+}
+
+/**
+ * Client du serveur de synchro Kazis.
+ *
+ * Le serveur n'écoute que sur le réseau privé (Tailscale) et exige le même jeton que
+ * l'app Kazis. Un seul appel HTTP à la fois, donc `HttpURLConnection` suffit.
+ */
+class KazisClient {
+
+    /** Les repas en attente. Lève [KazisUnauthorized] si le jeton est refusé. */
+    suspend fun pendingMeals(baseUrl: String, token: String): List<KazisMeal> =
+        withContext(Dispatchers.IO) {
+            val body = request(baseUrl, token, "/v1/meals", "GET", null)
+            parseMeals(body)
+        }
+
+    /** Confirme l'enregistrement : les repas sortent de la file côté Kazis. */
+    suspend fun acknowledge(baseUrl: String, token: String, ids: List<Long>) {
+        if (ids.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            val payload = JSONObject().put("ids", JSONArray().apply { ids.forEach { put(it) } })
+            request(baseUrl, token, "/v1/meals/ack", "POST", payload.toString())
+        }
+    }
+
+    private fun request(
+        baseUrl: String,
+        token: String,
+        path: String,
+        method: String,
+        body: String?,
+    ): String {
+        val connection = (URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            setRequestProperty("Authorization", "Bearer $token")
+            connectTimeout = TIMEOUT_MS
+            readTimeout = TIMEOUT_MS
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+            }
+        }
+        try {
+            body?.let { connection.outputStream.use { stream -> stream.write(it.toByteArray()) } }
+            return when (connection.responseCode) {
+                HttpURLConnection.HTTP_OK ->
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                HttpURLConnection.HTTP_UNAUTHORIZED -> throw KazisUnauthorized()
+                else -> throw KazisError("le serveur a répondu ${connection.responseCode}")
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    companion object {
+        private const val TIMEOUT_MS = 8_000
+
+        /** Lit la réponse de `/v1/meals`. Fonction pure, testable sans réseau. */
+        fun parseMeals(json: String): List<KazisMeal> {
+            val array = JSONObject(json).optJSONArray("meals") ?: return emptyList()
+            return (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val name = item.optString("name").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val day = runCatching { LocalDate.parse(item.optString("day")) }.getOrNull()
+                    ?: return@mapNotNull null
+                KazisMeal(
+                    id = item.optLong("id"),
+                    name = name,
+                    calories = item.optInt("calories"),
+                    proteinG = item.optDouble("protein_g", 0.0).orZero(),
+                    carbsG = item.optDouble("carbs_g", 0.0).orZero(),
+                    fatG = item.optDouble("fat_g", 0.0).orZero(),
+                    mealType = MealType.byId(item.optString("meal_type")),
+                    day = day,
+                    barcode = item.optString("barcode").takeIf { it.isNotBlank() && it != "null" },
+                    grams = item.optDouble("grams").takeIf { !it.isNaN() && it > 0 },
+                )
+            }
+        }
+
+        private fun Double.orZero(): Double = if (isNaN()) 0.0 else this
+    }
+}
+
+/** Jeton refusé : inutile de réessayer sans le corriger. */
+class KazisUnauthorized : Exception("jeton refusé par Kazis")
+
+/** Serveur injoignable ou réponse inattendue. */
+class KazisError(message: String) : Exception(message)

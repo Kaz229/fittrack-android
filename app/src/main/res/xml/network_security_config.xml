@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Open Food Facts est joint en HTTPS, et le reste du trafic en clair est refusé.
+  Seule exception : le serveur Kazis, sur le réseau privé Tailscale, qui parle en HTTP
+  simple — le chiffrement est assuré par le tunnel WireGuard en dessous. Son adresse
+  étant saisie par l'utilisateur, elle ne peut pas être listée ici.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">openfoodfacts.org</domain>
+    </domain-config>
+</network-security-config>

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -29,6 +30,11 @@ data class UserProfile(
     }
 }
 
+/** Coordonnées du serveur Kazis. Vides tant que l'utilisateur ne les a pas saisies. */
+data class KazisSettings(val url: String = "", val token: String = "") {
+    val configured: Boolean get() = url.isNotBlank() && token.isNotBlank()
+}
+
 class UserPreferences(private val context: Context) {
 
     private val weightKey = doublePreferencesKey("weight_kg")
@@ -37,6 +43,8 @@ class UserPreferences(private val context: Context) {
     private val carbsGoalKey = intPreferencesKey("carbs_goal_g")
     private val fatGoalKey = intPreferencesKey("fat_goal_g")
     private val lastHealthSyncKey = longPreferencesKey("last_health_sync_epoch_second")
+    private val kazisUrlKey = stringPreferencesKey("kazis_url")
+    private val kazisTokenKey = stringPreferencesKey("kazis_token")
 
     val profile: Flow<UserProfile> = context.dataStore.data.map { prefs ->
         UserProfile(
@@ -56,6 +64,22 @@ class UserPreferences(private val context: Context) {
 
     suspend fun setDailyCalorieGoal(goal: Int) {
         context.dataStore.edit { it[goalKey] = goal }
+    }
+
+    /**
+     * Adresse et jeton du serveur Kazis, d'où viennent les repas dictés à l'assistant.
+     * Le jeton n'ouvre qu'un serveur du réseau privé ; il est stocké comme le reste
+     * des préférences, dans l'espace privé de l'application.
+     */
+    val kazis: Flow<KazisSettings> = context.dataStore.data.map { prefs ->
+        KazisSettings(url = prefs[kazisUrlKey] ?: "", token = prefs[kazisTokenKey] ?: "")
+    }
+
+    suspend fun setKazis(settings: KazisSettings) {
+        context.dataStore.edit {
+            it[kazisUrlKey] = settings.url.trim()
+            it[kazisTokenKey] = settings.token.trim()
+        }
     }
 
     /** Horodatage de la dernière synchronisation Health Connect réussie, en secondes. */

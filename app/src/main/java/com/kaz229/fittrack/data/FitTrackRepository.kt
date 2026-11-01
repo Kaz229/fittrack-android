@@ -20,6 +20,7 @@ class FitTrackRepository(
     val exercises: ExerciseCatalog,
     private val openFoodFacts: OpenFoodFactsClient = OpenFoodFactsClient(),
     private val healthConnect: HealthConnectManager? = null,
+    private val kazis: KazisClient = KazisClient(),
 ) {
 
     val profile: Flow<UserProfile> = userPreferences.profile
@@ -228,6 +229,63 @@ class FitTrackRepository(
         }
     }
 
+    // --- Repas dictés à Kazis ------------------------------------------------
+
+    val kazisSettings: Flow<KazisSettings> = userPreferences.kazis
+
+    suspend fun setKazisSettings(settings: KazisSettings) = userPreferences.setKazis(settings)
+
+    /**
+     * Récupère les repas déposés par un assistant, les enregistre, puis confirme.
+     *
+     * Un repas donné par code-barres arrive sans valeurs : c'est ici qu'il est résolu
+     * chez Open Food Facts, en passant par le cache. Un produit introuvable est laissé
+     * dans la file plutôt que d'être enregistré faux — il sera retenté, et reste
+     * annulable depuis Telegram.
+     */
+    suspend fun fetchKazisMeals(today: LocalDate = LocalDate.now()): KazisFetch {
+        val settings = userPreferences.kazis.first()
+        if (!settings.configured) return KazisFetch.NotConfigured
+        return try {
+            val pending = kazis.pendingMeals(settings.url, settings.token)
+            val saved = mutableListOf<Long>()
+            var skipped = 0
+            for (meal in pending) {
+                if (saveKazisMeal(meal, today)) saved += meal.id else skipped++
+            }
+            kazis.acknowledge(settings.url, settings.token, saved)
+            KazisFetch.Success(added = saved.size, skipped = skipped)
+        } catch (_: KazisUnauthorized) {
+            KazisFetch.Unauthorized
+        } catch (e: Exception) {
+            KazisFetch.Failed(e.message ?: "serveur injoignable")
+        }
+    }
+
+    /** Enregistre un repas venu de Kazis. Faux si le produit n'a pas pu être résolu. */
+    private suspend fun saveKazisMeal(meal: KazisMeal, today: LocalDate): Boolean {
+        if (!meal.needsLookup) {
+            mealDao.insert(
+                Meal(
+                    name = meal.name,
+                    calories = meal.calories,
+                    mealType = meal.mealType.id,
+                    epochDay = meal.day.toEpochDay(),
+                    proteinG = meal.proteinG,
+                    carbsG = meal.carbsG,
+                    fatG = meal.fatG,
+                    barcode = meal.barcode,
+                    grams = meal.grams,
+                ),
+            )
+            return true
+        }
+        val lookup = lookupFood(meal.barcode!!, today)
+        if (lookup !is FoodLookup.Found) return false
+        addFoodMeal(lookup.product, meal.grams!!, meal.mealType, meal.day)
+        return true
+    }
+
     // --- Health Connect ------------------------------------------------------
 
     val lastHealthSync: Flow<Long?> = userPreferences.lastHealthSync
@@ -284,6 +342,7 @@ class FitTrackRepository(
                     userPreferences = UserPreferences(context.applicationContext),
                     exercises = ExerciseCatalog.get(context),
                     healthConnect = HealthConnectManager(context.applicationContext),
+                    kazis = KazisClient(),
                 ).also { instance = it }
             }
         }
