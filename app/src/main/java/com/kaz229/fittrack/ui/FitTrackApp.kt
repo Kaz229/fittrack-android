@@ -46,6 +46,7 @@ import com.kaz229.fittrack.ui.screens.AddCardioDialog
 import com.kaz229.fittrack.ui.screens.AddMealDialog
 import com.kaz229.fittrack.ui.screens.ExerciseDetailScreen
 import com.kaz229.fittrack.ui.screens.ExercisesScreen
+import com.kaz229.fittrack.ui.screens.HealthConnectScreen
 import com.kaz229.fittrack.ui.screens.HomeScreen
 import com.kaz229.fittrack.ui.screens.MealsScreen
 import com.kaz229.fittrack.ui.screens.ProfileScreen
@@ -69,6 +70,7 @@ private const val SESSION_DETAIL = "session"
 private const val EXERCISE_DETAIL = "exercise"
 private const val PROFILE = "profile"
 private const val SCAN = "scan"
+private const val HEALTH = "health"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,6 +94,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val meals by viewModel.todayMeals.collectAsStateWithLifecycle()
     val macros by viewModel.todayMacros.collectAsStateWithLifecycle()
     val scanState by viewModel.scan.collectAsStateWithLifecycle()
+    val healthState by viewModel.health.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val exercisesById by viewModel.exercisesById.collectAsStateWithLifecycle()
     val openSession by viewModel.openSession.collectAsStateWithLifecycle()
@@ -104,6 +107,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
         EXERCISE_DETAIL -> "Exercice"
         PROFILE -> "Profil"
         SCAN -> "Scanner un produit"
+        HEALTH -> "Health Connect"
         else -> currentTab?.label ?: "FitTrack"
     }
 
@@ -229,6 +233,14 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     onDelete = viewModel::deleteMeal,
                 )
             }
+            composable(HEALTH) {
+                HealthConnectScreen(
+                    state = healthState,
+                    onSync = viewModel::syncHealthConnect,
+                    onPermissionsChanged = viewModel::refreshHealthPermissions,
+                    onUseWeight = viewModel::applyWeightFromHealth,
+                )
+            }
             composable(SCAN) {
                 ScanScreen(
                     state = scanState,
@@ -267,6 +279,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
             composable(PROFILE) {
                 ProfileScreen(
                     profile = profile,
+                    onOpenHealthConnect = { navController.navigate(HEALTH) },
                     onSave = { weight, goal, macroGoals ->
                         viewModel.setWeight(weight)
                         viewModel.setDailyCalorieGoal(goal)

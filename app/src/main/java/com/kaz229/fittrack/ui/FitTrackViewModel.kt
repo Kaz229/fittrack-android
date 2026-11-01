@@ -10,6 +10,7 @@ import com.kaz229.fittrack.data.ExerciseCatalog
 import com.kaz229.fittrack.data.ExerciseSet
 import com.kaz229.fittrack.data.FitTrackRepository
 import com.kaz229.fittrack.data.FoodLookup
+import com.kaz229.fittrack.data.HealthConnectAvailability
 import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.Labels
 import com.kaz229.fittrack.data.MacroGoals
@@ -17,6 +18,7 @@ import com.kaz229.fittrack.data.MacroTotals
 import com.kaz229.fittrack.data.Meal
 import com.kaz229.fittrack.data.MealType
 import com.kaz229.fittrack.data.Session
+import com.kaz229.fittrack.data.SyncResult
 import com.kaz229.fittrack.data.UserProfile
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +41,15 @@ data class CatalogState(
     val bodyPart: String? = null,
     val equipment: String? = null,
     val loading: Boolean = true,
+)
+
+/** Ce que l'écran Health Connect doit afficher. */
+data class HealthState(
+    val availability: HealthConnectAvailability = HealthConnectAvailability.UNSUPPORTED,
+    val permissionsGranted: Boolean = false,
+    val syncing: Boolean = false,
+    val lastSyncEpochSecond: Long? = null,
+    val lastResult: SyncResult? = null,
 )
 
 /** Pourquoi un code-barres scanné n'a rien donné. */
@@ -200,6 +211,45 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
         val product = _scan.value.product ?: return@launch
         repository.addFoodMeal(product, grams, mealType, today)
         _scan.value = ScanState()
+    }
+
+    // --- Health Connect ------------------------------------------------------
+
+    private val healthSyncing = MutableStateFlow(false)
+    private val healthPermissions = MutableStateFlow(false)
+    private val healthResult = MutableStateFlow<SyncResult?>(null)
+
+    val health: StateFlow<HealthState> = combine(
+        healthSyncing,
+        healthPermissions,
+        healthResult,
+        repository.lastHealthSync,
+    ) { syncing, granted, result, lastSync ->
+        HealthState(
+            availability = repository.healthConnectAvailability(),
+            permissionsGranted = granted,
+            syncing = syncing,
+            lastSyncEpochSecond = lastSync,
+            lastResult = result,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HealthState())
+
+    /** À rappeler au retour de l'écran d'autorisations, qui ne renvoie pas de résultat fiable. */
+    fun refreshHealthPermissions() = viewModelScope.launch {
+        healthPermissions.value = repository.healthConnectPermissionsGranted()
+    }
+
+    fun syncHealthConnect() = viewModelScope.launch {
+        healthSyncing.value = true
+        healthResult.value = repository.syncHealthConnect(today)
+        healthPermissions.value = repository.healthConnectPermissionsGranted()
+        healthSyncing.value = false
+    }
+
+    /** Reprend dans le profil le poids relu depuis Health Connect. */
+    fun applyWeightFromHealth(weightKg: Double) = viewModelScope.launch {
+        repository.setWeight(weightKg)
+        healthResult.value = null
     }
 
     // --- Séances, repas, bilans ---------------------------------------------

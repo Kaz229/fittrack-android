@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.kaz229.fittrack"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.kaz229.fittrack"
@@ -64,11 +64,16 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
 
+    implementation(libs.androidx.health.connect.client)
+
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode.scanning)
+    // Fournit ListenableFuture.await() et, au passage, le vrai artefact guava :
+    // sans lui, Health Connect tire la version « vide » qui masque ListenableFuture.
+    implementation(libs.androidx.concurrent.futures.ktx)
 
     testImplementation(libs.junit)
     // org.json n'est qu'un stub dans android.jar : la vraie implémentation permet de

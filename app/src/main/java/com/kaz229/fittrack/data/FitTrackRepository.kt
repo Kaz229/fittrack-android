@@ -19,6 +19,7 @@ class FitTrackRepository(
     private val userPreferences: UserPreferences,
     val exercises: ExerciseCatalog,
     private val openFoodFacts: OpenFoodFactsClient = OpenFoodFactsClient(),
+    private val healthConnect: HealthConnectManager? = null,
 ) {
 
     val profile: Flow<UserProfile> = userPreferences.profile
@@ -227,6 +228,36 @@ class FitTrackRepository(
         }
     }
 
+    // --- Health Connect ------------------------------------------------------
+
+    val lastHealthSync: Flow<Long?> = userPreferences.lastHealthSync
+
+    fun healthConnectAvailability(): HealthConnectAvailability =
+        healthConnect?.availability() ?: HealthConnectAvailability.UNSUPPORTED
+
+    suspend fun healthConnectPermissionsGranted(): Boolean =
+        healthConnect?.hasAllPermissions() ?: false
+
+    /**
+     * Exporte les séances et repas du dernier mois, et relit le poids le plus récent.
+     * Le poids n'est pas appliqué d'office : il est renvoyé pour que l'utilisateur
+     * décide de remplacer, ou non, celui de son profil.
+     */
+    suspend fun syncHealthConnect(today: LocalDate = LocalDate.now()): SyncResult {
+        val manager = healthConnect ?: return SyncResult.Unavailable
+        val fromDay = today.minusDays((SYNC_DAYS - 1).toLong()).toEpochDay()
+        val result = manager.sync(
+            sessions = sessionDao.since(fromDay),
+            meals = mealDao.since(fromDay),
+            today = today,
+            days = SYNC_DAYS,
+        )
+        if (result is SyncResult.Success) {
+            userPreferences.setLastHealthSync(System.currentTimeMillis() / 1000)
+        }
+        return result
+    }
+
     // --- Profil --------------------------------------------------------------
 
     suspend fun setWeight(weightKg: Double) = userPreferences.setWeight(weightKg)
@@ -236,6 +267,9 @@ class FitTrackRepository(
     suspend fun setMacroGoals(goals: MacroGoals) = userPreferences.setMacroGoals(goals)
 
     companion object {
+        /** Fenêtre d'export : réécrire tout l'historique à chaque fois serait inutile. */
+        const val SYNC_DAYS = 30
+
         @Volatile
         private var instance: FitTrackRepository? = null
 
@@ -249,6 +283,7 @@ class FitTrackRepository(
                     foodProductDao = db.foodProductDao(),
                     userPreferences = UserPreferences(context.applicationContext),
                     exercises = ExerciseCatalog.get(context),
+                    healthConnect = HealthConnectManager(context.applicationContext),
                 ).also { instance = it }
             }
         }

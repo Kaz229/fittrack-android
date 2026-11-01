@@ -28,6 +28,10 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY epochDay DESC, id DESC")
     fun observeAll(): Flow<List<Session>>
 
+    /** Instantané des séances d'une période, pour l'export vers Health Connect. */
+    @Query("SELECT * FROM sessions WHERE epochDay >= :fromDay ORDER BY epochDay, id")
+    suspend fun since(fromDay: Long): List<Session>
+
     @Query("SELECT COALESCE(SUM(caloriesBurned), 0) FROM sessions WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>
 
@@ -81,6 +85,10 @@ interface MealDao {
 
     @Query("SELECT * FROM meals WHERE epochDay = :epochDay ORDER BY id DESC")
     fun observeForDay(epochDay: Long): Flow<List<Meal>>
+
+    /** Instantané des repas d'une période, pour l'export vers Health Connect. */
+    @Query("SELECT * FROM meals WHERE epochDay >= :fromDay ORDER BY epochDay, id")
+    suspend fun since(fromDay: Long): List<Meal>
 
     @Query("SELECT COALESCE(SUM(calories), 0) FROM meals WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>
