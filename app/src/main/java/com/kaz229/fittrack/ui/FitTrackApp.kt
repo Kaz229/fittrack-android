@@ -121,6 +121,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val healthState by viewModel.health.collectAsStateWithLifecycle()
     val kazisState by viewModel.kazis.collectAsStateWithLifecycle()
     val foodSearchState by viewModel.foodSearch.collectAsStateWithLifecycle()
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val exercisesById by viewModel.exercisesById.collectAsStateWithLifecycle()
     val openSession by viewModel.openSession.collectAsStateWithLifecycle()
@@ -142,7 +143,8 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                // Les onglets affichent leur propre en-tête : un titre ici ferait doublon
+                title = { if (!isTopLevel) Text(title) },
                 navigationIcon = {
                     if (!isTopLevel) {
                         IconButton(onClick = { navController.popBackStack() }) {
@@ -240,6 +242,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     lastWeek = lastWeek,
                     volumeToday = volumeToday,
                     setCountToday = setCountToday,
+                    today = viewModel.todayLabel,
                 )
             }
             composable(Tab.SESSIONS.route) {
@@ -341,6 +344,8 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
             composable(PROFILE) {
                 ProfileScreen(
                     profile = profile,
+                    theme = theme,
+                    onThemeChange = viewModel::setTheme,
                     onOpenHealthConnect = { navController.navigate(HEALTH) },
                     onOpenKazis = { navController.navigate(KAZIS) },
                     onSave = { weight, goal, macroGoals ->

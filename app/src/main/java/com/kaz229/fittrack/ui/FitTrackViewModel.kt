@@ -23,6 +23,7 @@ import com.kaz229.fittrack.data.MacroTotals
 import com.kaz229.fittrack.data.Meal
 import com.kaz229.fittrack.data.MealType
 import com.kaz229.fittrack.data.Session
+import com.kaz229.fittrack.data.ThemeChoice
 import com.kaz229.fittrack.data.SyncResult
 import com.kaz229.fittrack.data.UserProfile
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,6 +39,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** Ce que l'écran « Exercices » affiche : la liste filtrée et les filtres disponibles. */
 data class CatalogState(
@@ -111,6 +114,11 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
 
     private val repository = FitTrackRepository.get(application)
     private val today: LocalDate = LocalDate.now()
+
+    /** « Dimanche 2 novembre », pour l'en-tête de l'accueil. */
+    val todayLabel: String = today
+        .format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.FRENCH))
+        .replaceFirstChar { it.uppercase() }
 
     // --- Catalogue d'exercices ----------------------------------------------
 
@@ -387,6 +395,11 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
     }
 
     // --- Séances, repas, bilans ---------------------------------------------
+
+    val theme: StateFlow<ThemeChoice> = repository.theme
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeChoice.SYSTEM)
+
+    fun setTheme(choice: ThemeChoice) = viewModelScope.launch { repository.setTheme(choice) }
 
     val profile: StateFlow<UserProfile> = repository.profile
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserProfile())

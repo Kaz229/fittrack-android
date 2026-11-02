@@ -22,12 +22,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.FilterChip
 import com.kaz229.fittrack.data.MacroGoals
+import com.kaz229.fittrack.data.ThemeChoice
 import com.kaz229.fittrack.data.UserProfile
 
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
+    theme: ThemeChoice,
+    onThemeChange: (ThemeChoice) -> Unit,
     onSave: (weightKg: Double, goal: Int, macroGoals: MacroGoals) -> Unit,
     onOpenHealthConnect: () -> Unit,
     onOpenKazis: () -> Unit,
@@ -72,6 +77,16 @@ fun ProfileScreen(
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
         )
+        Text(text = "Apparence", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemeChoice.entries.forEach { choice ->
+                FilterChip(
+                    selected = choice == theme,
+                    onClick = { onThemeChange(choice) },
+                    label = { Text(choice.label) },
+                )
+            }
+        }
         OutlinedTextField(
             value = weight,
             onValueChange = { weight = it },

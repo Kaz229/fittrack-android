@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FitTrack — Bento</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   Deux thèmes, un seul jeu de variables.
+   Les accents changent de valeur entre clair et sombre : un néon conçu
+   pour le noir devient illisible sur blanc. Chaque couleur de texte
+   tient le ratio AA (4,5:1) sur son fond.
+------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --bg: #0A0A0A;
+  --card: #151515;
+  --card-raised: #1E1E1E;
+  --border: #282828;
+  --text: #FFFFFF;
+  --muted: #9A9A9A;          /* 7,2:1 sur --card, contre 4,0:1 pour #777 */
+  --accent: #CCFF00;         /* calories : la seule couleur vive */
+  --accent-ink: #0A0A0A;
+  --protein: #3DDC97;
+  --carbs: #FFB44D;
+  --fat: #B98AFF;
+  --track: #2E2E2E;        /* assez clair pour que les barres grises se lisent sur --card */
+  --shadow: 0 0 24px rgba(204, 255, 0, .18);
+}
+:root[data-theme="light"] {
+  --bg: #F2F2EE;             /* blanc cassé : moins fatigant qu'un blanc pur en plein soleil */
+  --card: #FFFFFF;
+  --card-raised: #FBFBF9;
+  --border: #E2E2DC;
+  --text: #121212;
+  --muted: #666660;          /* 5,7:1 sur blanc */
+  --accent: #4D6B00;         /* le vert acide assombri : 6,1:1 sur blanc */
+  --accent-ink: #FFFFFF;
+  --protein: #00765A;
+  --carbs: #9A5800;
+  --fat: #6B35C4;
+  --track: #EDEDE7;
+  --shadow: 0 2px 12px rgba(0, 0, 0, .06);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: Inter, -apple-system, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; gap: 24px; flex-wrap: wrap;
+  transition: background .25s, color .25s;
+}
+
+.phone {
+  width: 100%; max-width: 400px; height: 820px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 36px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.scroll { flex: 1; overflow-y: auto; padding: 20px 16px 110px; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+.topbar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+.kicker { color: var(--muted); font-size: 13px; font-weight: 500; }
+h1 { font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
+.theme-toggle {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 20px;
+}
+.wide { grid-column: span 2; }
+
+/* --- Calories : le seul chiffre qu'on lit de loin --- */
+.kcal-left { font-size: 48px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.kcal-goal { color: var(--muted); font-size: 13px; font-weight: 500; }
+.bar { background: var(--track); border-radius: 99px; height: 10px; margin-top: 18px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); border-radius: 99px; box-shadow: var(--shadow); }
+.bar-legend { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); font-weight: 500; }
+
+/* --- Macros : même traitement pour les trois, aucune ne domine --- */
+.macro { display: flex; flex-direction: column; gap: 10px; }
+.macro-head { display: flex; justify-content: space-between; align-items: baseline; }
+.macro-name { font-size: 13px; color: var(--muted); font-weight: 500; }
+.macro-val { font-size: 17px; font-weight: 700; }
+.macro-val small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.macro-bar { background: var(--track); border-radius: 99px; height: 6px; overflow: hidden; }
+.macro-bar > span { display: block; height: 100%; border-radius: 99px; }
+
+/* --- Tendance : une échelle, sinon les barres ne disent rien --- */
+.chart { display: flex; align-items: flex-end; gap: 6px; height: 96px; margin-top: 4px; }
+.chart .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; gap: 6px; }
+.chart .stack { background: var(--track); border-radius: 6px; position: relative; }
+.chart .stack.today { background: var(--accent); }
+.chart .day { font-size: 10px; color: var(--muted); text-align: center; font-weight: 600; }
+.axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+.goal-line { border-top: 1px dashed var(--border); position: relative; margin: 0 0 -1px; }
+
+.section { font-size: 13px; font-weight: 600; color: var(--muted); margin: 24px 0 12px; }
+
+/* --- Repas : une ligne de temps, les trous se voient --- */
+.timeline { position: relative; padding-left: 28px; }
+.timeline::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+.meal { position: relative; margin-bottom: 12px; }
+.dot { position: absolute; left: -28px; top: 20px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2px solid var(--border); }
+.dot.filled { background: var(--accent); border-color: var(--accent); }
+.meal-head { display: flex; justify-content: space-between; align-items: baseline; }
+.meal-title { font-size: 14px; font-weight: 600; }
+.meal-kcal { font-size: 15px; font-weight: 700; }
+.meal-kcal small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.meal-items { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.tags { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.tag { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); }
+.empty {
+  width: 100%; border: 1px dashed var(--border); border-radius: 24px; padding: 18px;
+  color: var(--muted); font-size: 14px; font-weight: 500; background: none; cursor: pointer;
+  font-family: inherit;
+}
+
+/* --- Exercices : recherche et filtres, comme dans l'app --- */
+.search {
+  width: 100%; background: var(--card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 13px 16px; font-size: 14px; color: var(--text);
+  font-family: inherit; outline: none;
+}
+.search::placeholder { color: var(--muted); }
+.chips { display: flex; gap: 8px; overflow-x: auto; margin: 14px 0 4px; padding-bottom: 4px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  white-space: nowrap; font-size: 13px; font-weight: 500; padding: 8px 14px;
+  border-radius: 99px; border: 1px solid var(--border); background: var(--card); color: var(--text);
+  cursor: pointer; font-family: inherit;
+}
+.chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.count { font-size: 12px; color: var(--muted); margin: 14px 0 8px; font-weight: 500; }
+.row { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.row-name { font-size: 15px; font-weight: 600; }
+.row-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* --- Séance en cours --- */
+.live { border: 1px solid var(--accent); background: var(--card-raised); }
+.live-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; background: var(--accent); color: var(--accent-ink);
+  padding: 4px 9px; border-radius: 99px;
+}
+.live-title { font-size: 22px; font-weight: 800; margin-top: 10px; letter-spacing: -.02em; }
+.play {
+  width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); font-size: 17px;
+  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow);
+}
+.sets { display: flex; gap: 20px; margin-top: 18px; }
+.stat-label { font-size: 11px; color: var(--muted); font-weight: 500; }
+.stat-value { font-size: 19px; font-weight: 700; margin-top: 2px; }
+
+.nav {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-around; padding: 12px 8px 26px;
+}
+.nav button {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; padding: 4px 10px;
+}
+.nav button.on { color: var(--accent); }
+.nav .ico { font-size: 17px; }
+
+.tab { display: none; }
+.tab.on { display: block; animation: in .25s ease; }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.note { max-width: 320px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.note h2 { font-size: 15px; color: var(--text); margin-bottom: 10px; font-weight: 700; }
+.note li { margin-bottom: 8px; margin-left: 16px; }
+@media (max-width: 860px) { .note { max-width: 400px; } }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="scroll" id="scroll">
+
+    <!-- ============ ACCUEIL ============ -->
+    <section class="tab on" id="t-accueil">
+      <div class="topbar">
+        <div>
+          <p class="kicker">Dimanche 2 novembre</p>
+          <h1>Aujourd'hui</h1>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Basculer clair / sombre">◐</button>
+      </div>
+
+      <div class="grid">
+        <div class="card wide">
+          <p class="kicker">Il te reste</p>
+          <div style="display:flex; align-items:baseline; gap:8px; margin-top:4px;">
+            <span class="kcal-left">1&nbsp;498</span>
+            <span class="kcal-goal">sur 2 200 kcal</span>
+          </div>
+          <div class="bar"><span style="width:32%"></span></div>
+          <div class="bar-legend"><span>702 ingérées</span><span>0 brûlées</span></div>
+        </div>
+
+        <div class="card wide">
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div class="macro">
+              <div class="macro-head">
+                <span class="macro-name">Protéines</span>
+                <span class="macro-val">43 g <small>/ 150 g</small></span>
+              </div>
+              <div class="macro-bar"><span style="width:28%; background:var(--protein)"></span></div>
+            </div>
+            <div class="macro">
+              <div class="macro-head">
+                <span class="macro-name">Glucides</span>
+                <span class="macro-val">56 g <small>/ 250 g</small></span>
+              </div>
+              <div class="macro-bar"><span style="width:22%; background:var(--carbs)"></span></div>
+            </div>
+            <div class="macro">
+              <div class="macro-head">
+                <span class="macro-name">Lipides</span>
+                <span class="macro-val">33 g <small>/ 70 g</small></span>
+              </div>
+              <div class="macro-bar"><span style="width:47%; background:var(--fat)"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card wide">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <span style="font-size:14px; font-weight:600;">Calories nettes</span>
+            <span class="kicker">7 derniers jours</span>
+          </div>
+          <div class="axis"><span>2 200 kcal</span><span>objectif</span></div>
+          <div class="goal-line"></div>
+          <div class="chart">
+            <div class="col"><div class="stack" style="height:82%"></div><span class="day">lun</span></div>
+            <div class="col"><div class="stack" style="height:95%"></div><span class="day">mar</span></div>
+            <div class="col"><div class="stack" style="height:71%"></div><span class="day">mer</span></div>
+            <div class="col"><div class="stack" style="height:104%"></div><span class="day">jeu</span></div>
+            <div class="col"><div class="stack" style="height:88%"></div><span class="day">ven</span></div>
+            <div class="col"><div class="stack" style="height:63%"></div><span class="day">sam</span></div>
+            <div class="col"><div class="stack today" style="height:32%"></div><span class="day">auj</span></div>
+          </div>
+        </div>
+
+        <div class="card wide">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:14px; font-weight:600;">Entraînement</span>
+            <span class="kicker">Push day · en cours</span>
+          </div>
+          <div class="sets">
+            <div><div class="stat-label">Séries</div><div class="stat-value">14</div></div>
+            <div><div class="stat-label">Volume</div><div class="stat-value">4,2 t</div></div>
+            <div><div class="stat-label">Durée</div><div class="stat-value">47 min</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ REPAS ============ -->
+    <section class="tab" id="t-repas">
+      <div class="topbar">
+        <div><p class="kicker">702 kcal · P 43 · G 56 · L 33</p><h1>Repas</h1></div>
+        <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      </div>
+
+      <div class="timeline">
+        <div class="meal">
+          <span class="dot filled"></span>
+          <div class="card" style="padding:16px; border-radius:22px;">
+            <div class="meal-head">
+              <span class="meal-title">Petit-déjeuner</span>
+              <span class="meal-kcal">320 <small>kcal</small></span>
+            </div>
+            <p class="meal-items">Flocons d'avoine · Whey</p>
+          </div>
+        </div>
+
+        <div class="meal">
+          <span class="dot filled"></span>
+          <div class="card" style="padding:16px; border-radius:22px;">
+            <div class="meal-head">
+              <span class="meal-title">Déjeuner</span>
+              <span class="meal-kcal">382 <small>kcal</small></span>
+            </div>
+            <p class="meal-items">Poulet à l'airfryer · Pommes de terre rissolées · Cancoillotte</p>
+            <div class="tags">
+              <span class="tag" style="color:var(--protein)">P 40 g</span>
+              <span class="tag" style="color:var(--carbs)">G 35 g</span>
+              <span class="tag" style="color:var(--fat)">L 12 g</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="meal">
+          <span class="dot"></span>
+          <button class="empty">Ajouter le dîner</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SÉANCES ============ -->
+    <section class="tab" id="t-seances">
+      <div class="topbar">
+        <div><p class="kicker">Cette semaine · 3 séances</p><h1>Séances</h1></div>
+        <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      </div>
+
+      <div class="card live">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="live-badge">En cours</span>
+            <h2 class="live-title">Séance salle</h2>
+            <p class="kicker" style="margin-top:6px;">Démarrée il y a 47 min</p>
+          </div>
+          <button class="play" title="Reprendre">▶</button>
+        </div>
+        <div class="sets">
+          <div><div class="stat-label">Séries</div><div class="stat-value">14</div></div>
+          <div><div class="stat-label">Volume</div><div class="stat-value">4,2 t</div></div>
+          <div><div class="stat-label">Exercices</div><div class="stat-value">5</div></div>
+        </div>
+      </div>
+
+      <p class="section">Historique</p>
+
+      <div class="card" style="padding:16px; border-radius:22px; margin-bottom:10px;">
+        <div class="meal-head">
+          <span class="meal-title">Séance salle</span>
+          <span class="kicker">Hier</span>
+        </div>
+        <p class="meal-items">18 séries · 5,1 t · 62 min · 328 kcal</p>
+      </div>
+      <div class="card" style="padding:16px; border-radius:22px; margin-bottom:10px;">
+        <div class="meal-head">
+          <span class="meal-title">Course à pied</span>
+          <span class="kicker">ven. 31/10 · Lyfta</span>
+        </div>
+        <p class="meal-items">35 min · 400 kcal</p>
+      </div>
+    </section>
+
+    <!-- ============ EXERCICES ============ -->
+    <section class="tab" id="t-exercices">
+      <div class="topbar">
+        <div><p class="kicker">Catalogue</p><h1>Exercices</h1></div>
+        <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      </div>
+
+      <input class="search" placeholder="Rechercher un exercice…">
+      <div class="chips">
+        <button class="chip on">Tous</button>
+        <button class="chip">Pectoraux</button>
+        <button class="chip">Dos</button>
+        <button class="chip">Jambes</button>
+        <button class="chip">Épaules</button>
+      </div>
+      <div class="chips">
+        <button class="chip">Barre</button>
+        <button class="chip">Haltères</button>
+        <button class="chip">Poulie</button>
+        <button class="chip">Poids du corps</button>
+      </div>
+
+      <p class="count">1 324 exercices</p>
+
+      <div class="row">
+        <div class="row-name">Développé couché à la barre</div>
+        <div class="row-meta">Pectoraux · pectoraux · Barre — record 85 kg</div>
+      </div>
+      <div class="row">
+        <div class="row-name">Élévations latérales aux haltères</div>
+        <div class="row-meta">Épaules · deltoïdes · Haltères — record 14 kg</div>
+      </div>
+      <div class="row">
+        <div class="row-name">Tirage vertical à la poulie</div>
+        <div class="row-meta">Dos · grand dorsal · Poulie — record 70 kg</div>
+      </div>
+      <div class="row">
+        <div class="row-name">Squat à la barre</div>
+        <div class="row-meta">Cuisses · quadriceps · Barre — record 110 kg</div>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="nav">
+    <button class="on" id="n-accueil" onclick="go('accueil')"><span class="ico">◧</span>Accueil</button>
+    <button id="n-repas" onclick="go('repas')"><span class="ico">◍</span>Repas</button>
+    <button id="n-seances" onclick="go('seances')"><span class="ico">◆</span>Séances</button>
+    <button id="n-exercices" onclick="go('exercices')"><span class="ico">☰</span>Exercices</button>
+  </nav>
+</div>
+
+<div class="note">
+  <h2>Ce qui change par rapport à ta maquette</h2>
+  <ul>
+    <li><strong>Un seul accent vif.</strong> Le vert acide ne sert plus qu'aux calories. Les macros gardent trois teintes, mais sourdes : elles distinguent sans se disputer l'attention.</li>
+    <li><strong>Contraste tenu.</strong> Le gris de texte passe de <code>#777</code> (4,0:1) à <code>#9A9A9A</code> (7,2:1). En clair, les néons sont remplacés par leurs versions assombries — un <code>#CCFF00</code> sur blanc est illisible.</li>
+    <li><strong>Le graphe a une échelle</strong> et la ligne d'objectif : une barre qui la dépasse se voit enfin.</li>
+    <li><strong>Les exercices retrouvent la recherche et les deux filtres</strong> (groupe, matériel) avec le vrai compte, au lieu de quatre tuiles décoratives.</li>
+    <li><strong>Tout est en français</strong>, et la séance en cours montre séries, volume et durée — ce que l'app sait déjà calculer.</li>
+  </ul>
+</div>
+
+<script>
+function toggleTheme() {
+  const root = document.documentElement;
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+}
+function go(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('on'));
+  document.getElementById('t-' + id).classList.add('on');
+  document.getElementById('n-' + id).classList.add('on');
+  document.getElementById('scroll').scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>

@@ -26,6 +26,10 @@ class FitTrackRepository(
 
     val profile: Flow<UserProfile> = userPreferences.profile
 
+    val theme: Flow<ThemeChoice> = userPreferences.theme
+
+    suspend fun setTheme(choice: ThemeChoice) = userPreferences.setTheme(choice)
+
     // --- Séances -------------------------------------------------------------
 
     fun allSessions(): Flow<List<Session>> = sessionDao.observeAll()

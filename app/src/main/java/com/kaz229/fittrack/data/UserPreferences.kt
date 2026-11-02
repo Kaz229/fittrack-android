@@ -31,6 +31,17 @@ data class UserProfile(
     }
 }
 
+/** Thème de l'application, choisi à la main ou laissé au système. */
+enum class ThemeChoice(val id: String, val label: String) {
+    SYSTEM("systeme", "Comme le système"),
+    LIGHT("clair", "Clair"),
+    DARK("sombre", "Sombre");
+
+    companion object {
+        fun byId(id: String?): ThemeChoice = entries.firstOrNull { it.id == id } ?: SYSTEM
+    }
+}
+
 /** Coordonnées du serveur Kazis. Vides tant que l'utilisateur ne les a pas saisies. */
 data class KazisSettings(val url: String = "", val token: String = "") {
     val configured: Boolean get() = url.isNotBlank() && token.isNotBlank()
@@ -47,6 +58,7 @@ class UserPreferences(private val context: Context) {
     private val kazisUrlKey = stringPreferencesKey("kazis_url")
     private val kazisTokenKey = stringPreferencesKey("kazis_token")
     private val deviceIdKey = stringPreferencesKey("device_id")
+    private val themeKey = stringPreferencesKey("theme_choice")
     private val lastBackupKey = longPreferencesKey("last_kazis_backup_epoch_second")
 
     val profile: Flow<UserProfile> = context.dataStore.data.map { prefs ->
@@ -97,6 +109,12 @@ class UserPreferences(private val context: Context) {
         val fresh = java.util.UUID.randomUUID().toString()
         context.dataStore.edit { it[deviceIdKey] = fresh }
         return fresh
+    }
+
+    val theme: Flow<ThemeChoice> = context.dataStore.data.map { ThemeChoice.byId(it[themeKey]) }
+
+    suspend fun setTheme(choice: ThemeChoice) {
+        context.dataStore.edit { it[themeKey] = choice.id }
     }
 
     /** Horodatage de la dernière sauvegarde réussie vers Kazis, en secondes. */
