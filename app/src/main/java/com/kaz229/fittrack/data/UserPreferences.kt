@@ -59,6 +59,18 @@ class UserPreferences(private val context: Context) {
     private val kazisTokenKey = stringPreferencesKey("kazis_token")
     private val deviceIdKey = stringPreferencesKey("device_id")
     private val themeKey = stringPreferencesKey("theme_choice")
+    private val heightKey = intPreferencesKey("height_cm")
+    private val ageKey = intPreferencesKey("age")
+    private val sexKey = stringPreferencesKey("sex")
+    private val stepsKey = intPreferencesKey("daily_steps")
+    private val gymPerWeekKey = intPreferencesKey("gym_per_week")
+    private val gymMinutesKey = intPreferencesKey("gym_minutes")
+    private val gymIntensityKey = stringPreferencesKey("gym_intensity")
+    private val runsPerWeekKey = intPreferencesKey("runs_per_week")
+    private val runMinutesKey = intPreferencesKey("run_minutes")
+    private val runIntensityKey = stringPreferencesKey("run_intensity")
+    private val bodyGoalKey = stringPreferencesKey("body_goal")
+    private val weeklyLossKey = doublePreferencesKey("weekly_loss_kg")
     private val lastBackupKey = longPreferencesKey("last_kazis_backup_epoch_second")
 
     val profile: Flow<UserProfile> = context.dataStore.data.map { prefs ->
@@ -112,6 +124,41 @@ class UserPreferences(private val context: Context) {
     }
 
     val theme: Flow<ThemeChoice> = context.dataStore.data.map { ThemeChoice.byId(it[themeKey]) }
+
+    /** Les réponses du questionnaire, d'où sortent l'objectif et les macros. */
+    val needsProfile: Flow<NeedsProfile> = context.dataStore.data.map { prefs ->
+        NeedsProfile(
+            heightCm = prefs[heightKey] ?: 0,
+            age = prefs[ageKey] ?: 0,
+            sex = Sex.byId(prefs[sexKey]),
+            dailySteps = prefs[stepsKey] ?: 0,
+            gymPerWeek = prefs[gymPerWeekKey] ?: 0,
+            gymMinutes = prefs[gymMinutesKey] ?: 60,
+            gymIntensity = Intensity.byId(prefs[gymIntensityKey]),
+            runsPerWeek = prefs[runsPerWeekKey] ?: 0,
+            runMinutes = prefs[runMinutesKey] ?: 30,
+            runIntensity = Intensity.byId(prefs[runIntensityKey]),
+            goal = Goal.byId(prefs[bodyGoalKey]),
+            weeklyLossKg = prefs[weeklyLossKey] ?: 0.5,
+        )
+    }
+
+    suspend fun setNeedsProfile(value: NeedsProfile) {
+        context.dataStore.edit {
+            it[heightKey] = value.heightCm
+            it[ageKey] = value.age
+            it[sexKey] = value.sex.id
+            it[stepsKey] = value.dailySteps
+            it[gymPerWeekKey] = value.gymPerWeek
+            it[gymMinutesKey] = value.gymMinutes
+            it[gymIntensityKey] = value.gymIntensity.id
+            it[runsPerWeekKey] = value.runsPerWeek
+            it[runMinutesKey] = value.runMinutes
+            it[runIntensityKey] = value.runIntensity.id
+            it[bodyGoalKey] = value.goal.id
+            it[weeklyLossKey] = value.weeklyLossKg
+        }
+    }
 
     suspend fun setTheme(choice: ThemeChoice) {
         context.dataStore.edit { it[themeKey] = choice.id }

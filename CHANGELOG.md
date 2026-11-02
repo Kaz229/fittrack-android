@@ -3,6 +3,18 @@
 Numérotation `MAJEUR.MINEUR.CORRECTIF`. Le numéro vit dans `app/build.gradle.kts`
 (`versionName`), et `versionCode` s'incrémente de un à chaque version publiée.
 
+## 1.1.0 (2026-11-02)
+
+### Nouveautés
+- Une ligne du journal se **déplace d'un repas à l'autre** sans la ressaisir.
+- **Calcul des besoins** à partir d'un questionnaire : taille, âge, sexe, pas quotidiens, séances de salle et sorties cardio avec leurs intensités, objectif. L'objectif calorique et les macros s'en déduisent et s'appliquent d'un bouton.
+- Pour une perte, le rythme hebdomadaire visé se choisit. L'app dit la perte **réellement atteignable** : quand le rythme demandé passerait sous le minimum vital, la cible est bornée et l'écart annoncé.
+- Le **poids est repris de Health Connect** à chaque lancement — celui qu'écrit la balance.
+
+### Corrections
+- Plus de bandeau en haut des onglets : la barre épouse le fond.
+- Les champs numériques du questionnaire gardaient mal le curseur ; « 180 » pouvait s'afficher « 801 ».
+
 ## 1.0.0 (2026-11-02)
 
 Première version complète : l'application couvre désormais la salle et la nutrition

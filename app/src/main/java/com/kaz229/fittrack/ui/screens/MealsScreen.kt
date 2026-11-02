@@ -17,7 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +29,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,8 +60,22 @@ fun MealsScreen(
     macros: MacroTotals,
     macroGoals: MacroGoals,
     onDelete: (Meal) -> Unit,
+    onMove: (Meal, MealType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // La ligne qu'on veut ranger ailleurs : le choix du moment se fait dans une feuille
+    var moving by remember { mutableStateOf<Meal?>(null) }
+    moving?.let { meal ->
+        MoveMealSheet(
+            meal = meal,
+            onDismiss = { moving = null },
+            onPick = { type ->
+                onMove(meal, type)
+                moving = null
+            },
+        )
+    }
+
     val byType = MealType.entries.associateWith { type ->
         meals.filter { it.mealType == type.id }
     }
@@ -87,6 +109,7 @@ fun MealsScreen(
                     type = type,
                     meals = byType[type].orEmpty(),
                     onDelete = onDelete,
+                    onMove = { moving = it },
                 )
             }
         }
@@ -95,7 +118,12 @@ fun MealsScreen(
 
 /** Un moment de la journée : son point sur la ligne, et ce qu'on y a mangé. */
 @Composable
-private fun MealBlock(type: MealType, meals: List<Meal>, onDelete: (Meal) -> Unit) {
+private fun MealBlock(
+    type: MealType,
+    meals: List<Meal>,
+    onDelete: (Meal) -> Unit,
+    onMove: (Meal) -> Unit,
+) {
     val filled = meals.isNotEmpty()
     Row(modifier = Modifier.fillMaxWidth()) {
         TimelineMarker(filled = filled)
@@ -134,7 +162,13 @@ private fun MealBlock(type: MealType, meals: List<Meal>, onDelete: (Meal) -> Uni
                             )
                         }
                     }
-                    meals.forEach { meal -> MealLine(meal, onDelete = { onDelete(meal) }) }
+                    meals.forEach { meal ->
+                        MealLine(
+                            meal = meal,
+                            onDelete = { onDelete(meal) },
+                            onMove = { onMove(meal) },
+                        )
+                    }
                 }
             }
         }
@@ -166,7 +200,7 @@ private fun TimelineMarker(filled: Boolean) {
 }
 
 @Composable
-private fun MealLine(meal: Meal, onDelete: () -> Unit) {
+private fun MealLine(meal: Meal, onDelete: () -> Unit, onMove: () -> Unit) {
     val colors = LocalMacroColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -193,12 +227,50 @@ private fun MealLine(meal: Meal, onDelete: () -> Unit) {
                 }
             }
         }
+        IconButton(onClick = onMove) {
+            Icon(
+                Icons.Filled.SwapVert,
+                contentDescription = "Déplacer ${meal.name} vers un autre repas",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         IconButton(onClick = onDelete) {
             Icon(
                 Icons.Filled.Delete,
                 contentDescription = "Supprimer ${meal.name}",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** Choix du moment où ranger la ligne. Le moment courant est écarté. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoveMealSheet(meal: Meal, onDismiss: () -> Unit, onPick: (MealType) -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = meal.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Déplacer vers",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            MealType.entries.filter { it.id != meal.mealType }.forEach { type ->
+                Text(
+                    text = type.label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onPick(type) }
+                        .padding(vertical = 14.dp, horizontal = 12.dp),
+                )
+            }
         }
     }
 }

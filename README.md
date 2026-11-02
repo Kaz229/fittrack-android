@@ -1,6 +1,6 @@
 # FitTrack
 
-**Version 1.0.0** — les nouveautés de chaque version sont dans [CHANGELOG.md](CHANGELOG.md).
+**Version 1.1.0** — les nouveautés de chaque version sont dans [CHANGELOG.md](CHANGELOG.md).
 
 Application Android pour **suivre ses séances de salle** et **tracker ses calories et ses macros**.
 Pas de compte, pas de serveur, pas de publicité : tout est stocké sur le téléphone.
@@ -44,7 +44,8 @@ Rien d'autre ne sort du téléphone, et les deux restent facultatifs.
 - **Saisie libre** : pour la cuisine maison ou un produit absent de la base, avec macros optionnelles.
 - **Accueil** : bilan calorique du jour (ingéré / brûlé / net), macros face aux objectifs, volume
   soulevé, progression vers l'objectif, historique des 7 derniers jours.
-- **Profil** : poids, objectif calorique et objectifs de macros, utilisés pour les calculs.
+- **Profil** : objectif calorique et macros **calculés** à partir de quelques questions
+  (pas quotidiens, séances, intensités, rythme de perte visé) ; poids repris de Health Connect.
 
 ### Estimation des calories brûlées
 
