@@ -1,6 +1,6 @@
 # FitTrack
 
-**Version 1.1.0** — les nouveautés de chaque version sont dans [CHANGELOG.md](CHANGELOG.md).
+**Version 1.1.1** — les nouveautés de chaque version sont dans [CHANGELOG.md](CHANGELOG.md).
 
 Application Android pour **suivre ses séances de salle** et **tracker ses calories et ses macros**.
 Pas de compte, pas de serveur, pas de publicité : tout est stocké sur le téléphone.

@@ -3,6 +3,11 @@
 Numérotation `MAJEUR.MINEUR.CORRECTIF`. Le numéro vit dans `app/build.gradle.kts`
 (`versionName`), et `versionCode` s'incrémente de un à chaque version publiée.
 
+## 1.1.1 (2026-11-02)
+
+### Corrections
+- Les macros proposées étaient intenables en cas de surpoids : rapportées au poids total, protéines et lipides mangeaient presque tout l'objectif et ne laissaient qu'une cinquantaine de grammes de glucides. Les protéines suivent maintenant un poids de référence plafonné — la masse grasse n'a pas de besoin protéique — et les lipides sont une part des calories, non un montant par kilo. Pour 126 kg à 2 353 kcal : 186 g de protéines, 237 g de glucides et 73 g de lipides, contre 277 / 57 / 113 avant.
+
 ## 1.1.0 (2026-11-02)
 
 ### Nouveautés

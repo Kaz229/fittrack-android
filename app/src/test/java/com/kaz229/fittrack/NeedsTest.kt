@@ -131,8 +131,38 @@ class NeedsTest {
         val maintien = computeNeeds(base, 75.0)!!
         val perte = computeNeeds(base.copy(goal = Goal.LOSE), 75.0)!!
 
-        assertEquals(135, maintien.macros.proteinG) // 1,8 g/kg
-        assertEquals(165, perte.macros.proteinG) // 2,2 g/kg
+        assertEquals(120, maintien.macros.proteinG) // 1,6 g/kg
+        assertEquals(150, perte.macros.proteinG) // 2,0 g/kg
+        assertTrue(perte.macros.proteinG > maintien.macros.proteinG)
+    }
+
+    @Test
+    fun `en surpoids les proteines suivent un poids de reference, pas le poids total`() {
+        // 126 kg pour 1,80 m : 2 g/kg donneraient 252 g, intenables et inutiles —
+        // la masse grasse n'a pas de besoin protéique.
+        val lourd = computeNeeds(base.copy(goal = Goal.LOSE), weightKg = 126.0)!!
+
+        assertTrue("Obtenu ${lourd.macros.proteinG} g", lourd.macros.proteinG in 150..200)
+    }
+
+    @Test
+    fun `les glucides restent utilisables meme a poids eleve`() {
+        // Le défaut d'origine : protéines et lipides au poids total mangeaient 2129 des
+        // 2353 kcal, et il ne restait que 57 g de glucides.
+        val lourd = computeNeeds(base.copy(goal = Goal.LOSE), weightKg = 126.0)!!
+
+        assertTrue("Obtenu ${lourd.macros.carbsG} g", lourd.macros.carbsG > 150)
+    }
+
+    @Test
+    fun `les lipides sont une part des calories, pas un montant par kilo`() {
+        val leger = computeNeeds(base, 60.0)!!
+        val lourd = computeNeeds(base, 126.0)!!
+
+        // À 0,9 g/kg, le lourd aurait 113 g ; en part des calories il reste mesuré
+        assertTrue("Obtenu ${lourd.macros.fatG} g", lourd.macros.fatG < 110)
+        assertTrue(lourd.macros.fatG * 9 < lourd.target * 0.35)
+        assertTrue(leger.macros.fatG * 9 < leger.target * 0.35)
     }
 
     @Test
