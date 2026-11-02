@@ -11,6 +11,9 @@ import com.kaz229.fittrack.data.ExerciseSet
 import com.kaz229.fittrack.data.FitTrackRepository
 import com.kaz229.fittrack.data.FoodLookup
 import com.kaz229.fittrack.data.HealthConnectAvailability
+import com.kaz229.fittrack.data.KazisBackup
+import com.kaz229.fittrack.data.KazisFetch
+import com.kaz229.fittrack.data.KazisSettings
 import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.Labels
 import com.kaz229.fittrack.data.MacroGoals
@@ -41,6 +44,16 @@ data class CatalogState(
     val bodyPart: String? = null,
     val equipment: String? = null,
     val loading: Boolean = true,
+)
+
+/** Ce que l'écran « repas dictés » doit afficher. */
+data class KazisState(
+    val settings: KazisSettings = KazisSettings(),
+    val fetching: Boolean = false,
+    val lastResult: KazisFetch? = null,
+    val backingUp: Boolean = false,
+    val lastBackupEpochSecond: Long? = null,
+    val lastBackupResult: KazisBackup? = null,
 )
 
 /** Ce que l'écran Health Connect doit afficher. */
@@ -211,6 +224,57 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
         val product = _scan.value.product ?: return@launch
         repository.addFoodMeal(product, grams, mealType, today)
         _scan.value = ScanState()
+    }
+
+    // --- Repas dictés à Kazis ------------------------------------------------
+
+    private val kazisFetching = MutableStateFlow(false)
+    private val kazisResult = MutableStateFlow<KazisFetch?>(null)
+
+    private val backingUp = MutableStateFlow(false)
+    private val backupResult = MutableStateFlow<KazisBackup?>(null)
+
+    val kazis: StateFlow<KazisState> = combine(
+        repository.kazisSettings,
+        kazisFetching,
+        kazisResult,
+        backingUp,
+        combine(repository.lastKazisBackup, backupResult) { last, result -> last to result },
+    ) { settings, fetching, result, saving, backup ->
+        KazisState(
+            settings = settings,
+            fetching = fetching,
+            lastResult = result,
+            backingUp = saving,
+            lastBackupEpochSecond = backup.first,
+            lastBackupResult = backup.second,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), KazisState())
+
+    init {
+        viewModelScope.launch {
+            // Au lancement : ce qui a été dicté pendant qu'on n'avait pas l'app sous la
+            // main, puis la sauvegarde de ce que le téléphone est seul à détenir.
+            repository.fetchKazisMeals(today)
+            repository.backupToKazis()
+        }
+    }
+
+    fun backupToKazis() = viewModelScope.launch {
+        backingUp.value = true
+        backupResult.value = repository.backupToKazis()
+        backingUp.value = false
+    }
+
+    fun saveKazisSettings(settings: KazisSettings) = viewModelScope.launch {
+        repository.setKazisSettings(settings)
+        kazisResult.value = null
+    }
+
+    fun fetchKazisMeals() = viewModelScope.launch {
+        kazisFetching.value = true
+        kazisResult.value = repository.fetchKazisMeals(today)
+        kazisFetching.value = false
     }
 
     // --- Health Connect ------------------------------------------------------

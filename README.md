@@ -8,6 +8,9 @@ Deux exceptions au « tout local » :
 - **Open Food Facts** : quand tu scannes un code-barres, ce code-barres est envoyé à
   [Open Food Facts](https://world.openfoodfacts.org) pour récupérer les valeurs nutritionnelles du
   produit. Le produit reçu est mis en cache localement pour rester consultable hors ligne.
+- **Kazis**, uniquement si tu le configures : les repas dictés à ton assistant personnel sont
+  récupérés depuis ton serveur, sur ton réseau privé, et tes séances, séries et repas y sont
+  sauvegardés. C'est la seule copie de tes charges hors du téléphone.
 - **Health Connect**, uniquement si tu l'actives : tes séances et ton journal alimentaire sont
   partagés avec le magasin de santé d'Android, qui les garde sur l'appareil et ne les transmet
   qu'aux applications que tu autorises explicitement.
@@ -56,6 +59,7 @@ corde à sauter 11,0 · rameur 7,0…). C'est une estimation, pas une mesure mé
 | Scan | CameraX + ML Kit (barcode-scanning groupé, fonctionne sans Play Services) |
 | Nutrition | API Open Food Facts v2 en lecture, `HttpURLConnection`, cache Room |
 | Santé | Health Connect (écriture séances, calories et nutrition ; lecture du poids) |
+| Repas dictés | file récupérée sur le serveur Kazis (réseau privé, jeton partagé) |
 | Build | Gradle 8.11 + AGP 8.7, `minSdk 26`, `targetSdk 35` |
 
 Architecture : `data` (entités Room, DAO, catalogue, repository) → `ui` (ViewModel exposant des
@@ -95,6 +99,7 @@ app/src/main/
     │   ├── Nutrition.kt           # FoodProduct, portions, macros et objectifs
     │   ├── OpenFoodFacts.kt       # client de lecture de l'API + parsing
     │   ├── HealthConnect.kt       # export des séances et repas, lecture du poids
+    │   ├── Kazis.kt               # récupération des repas dictés à l'assistant
     │   ├── Exercise.kt            # exercice du catalogue + libellés FR
     │   ├── ExerciseCatalog.kt     # chargement, recherche, filtres
     │   ├── Activities.kt          # activités cardio (MET) et calcul des calories

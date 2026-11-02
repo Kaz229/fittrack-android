@@ -30,6 +30,7 @@ fun ProfileScreen(
     profile: UserProfile,
     onSave: (weightKg: Double, goal: Int, macroGoals: MacroGoals) -> Unit,
     onOpenHealthConnect: () -> Unit,
+    onOpenKazis: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var weight by remember(profile.weightKg) {
@@ -137,6 +138,12 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Synchronisation Health Connect")
+        }
+        OutlinedButton(
+            onClick = onOpenKazis,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Repas dictés à Kazis")
         }
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
