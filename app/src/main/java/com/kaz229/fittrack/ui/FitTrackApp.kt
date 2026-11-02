@@ -62,9 +62,9 @@ private enum class Tab(
     val icon: ImageVector,
 ) {
     HOME("home", "Accueil", Icons.Filled.Home),
+    MEALS("meals", "Repas", Icons.Filled.Restaurant),
     SESSIONS("sessions", "Séances", Icons.Filled.FitnessCenter),
     EXERCISES("exercises", "Exercices", Icons.Filled.MenuBook),
-    MEALS("meals", "Repas", Icons.Filled.Restaurant),
 }
 
 private const val SESSION_DETAIL = "session"
