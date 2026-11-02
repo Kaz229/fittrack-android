@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.kaz229.fittrack.data.KazisBackup
 import com.kaz229.fittrack.data.KazisFetch
 import com.kaz229.fittrack.data.KazisSettings
 import com.kaz229.fittrack.ui.KazisState
@@ -40,6 +41,7 @@ fun KazisScreen(
     state: KazisState,
     onSave: (KazisSettings) -> Unit,
     onFetch: () -> Unit,
+    onBackup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var url by remember(state.settings.url) { mutableStateOf(state.settings.url) }
@@ -95,8 +97,30 @@ fun KazisScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(if (state.fetching) "Récupération…" else "Récupérer maintenant") }
         }
-        if (state.fetching) CircularProgressIndicator()
+        if (state.fetching || state.backingUp) CircularProgressIndicator()
         state.lastResult?.let { ResultCard(it) }
+
+        if (state.settings.configured) {
+            HorizontalDivider()
+            Text(
+                text = "Sauvegarde",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Tes séances, tes séries et ton journal sont envoyés à Kazis, qui les " +
+                    "conserve. C'est la seule copie hors du téléphone de tes charges : " +
+                    "Health Connect ne les porte pas.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(
+                onClick = onBackup,
+                enabled = !state.backingUp,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (state.backingUp) "Sauvegarde…" else "Sauvegarder maintenant") }
+            state.lastBackupEpochSecond?.let { LastBackupLine(it) }
+            state.lastBackupResult?.let { BackupCard(it) }
+        }
 
         HorizontalDivider()
         Text(
@@ -116,6 +140,46 @@ fun KazisScreen(
                 "est le même que celui de l'app Kazis.",
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+@Composable
+private fun LastBackupLine(epochSecond: Long) {
+    val formatted = remember(epochSecond) {
+        java.time.Instant.ofEpochSecond(epochSecond)
+            .atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy 'à' HH:mm"))
+    }
+    Text(
+        text = "Dernière sauvegarde : $formatted",
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+@Composable
+private fun BackupCard(result: KazisBackup) {
+    val (title, body) = when (result) {
+        is KazisBackup.Success ->
+            "Sauvegardé" to "${result.sessions} séance(s), ${result.sets} série(s) et " +
+                "${result.meals} ligne(s) de repas sont à l'abri."
+
+        KazisBackup.NotConfigured ->
+            "À configurer" to "Renseigne l'adresse du serveur et le jeton."
+
+        KazisBackup.Unauthorized ->
+            "Jeton refusé" to "Le serveur n'a pas accepté ce jeton."
+
+        is KazisBackup.Failed ->
+            "Sauvegarde impossible" to "${result.message}. Tes données restent sur le téléphone."
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(text = title, fontWeight = FontWeight.SemiBold)
+            Text(text = body, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

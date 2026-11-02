@@ -32,6 +32,10 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE epochDay >= :fromDay ORDER BY epochDay, id")
     suspend fun since(fromDay: Long): List<Session>
 
+    /** Tout l'historique, pour la sauvegarde. */
+    @Query("SELECT * FROM sessions ORDER BY id")
+    suspend fun all(): List<Session>
+
     @Query("SELECT COALESCE(SUM(caloriesBurned), 0) FROM sessions WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>
 
@@ -73,6 +77,10 @@ interface ExerciseSetDao {
 
     @Query("SELECT COUNT(*) FROM exercise_sets WHERE epochDay = :epochDay")
     fun observeSetCountForDay(epochDay: Long): Flow<Int>
+
+    /** Toutes les séries, pour la sauvegarde : c'est ce que rien d'autre ne conserve. */
+    @Query("SELECT * FROM exercise_sets ORDER BY id")
+    suspend fun all(): List<ExerciseSet>
 }
 
 @Dao
@@ -89,6 +97,10 @@ interface MealDao {
     /** Instantané des repas d'une période, pour l'export vers Health Connect. */
     @Query("SELECT * FROM meals WHERE epochDay >= :fromDay ORDER BY epochDay, id")
     suspend fun since(fromDay: Long): List<Meal>
+
+    /** Tout le journal, pour la sauvegarde. */
+    @Query("SELECT * FROM meals ORDER BY id")
+    suspend fun all(): List<Meal>
 
     @Query("SELECT COALESCE(SUM(calories), 0) FROM meals WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>

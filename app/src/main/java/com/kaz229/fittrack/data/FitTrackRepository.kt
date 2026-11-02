@@ -286,6 +286,35 @@ class FitTrackRepository(
         return true
     }
 
+    val lastKazisBackup: Flow<Long?> = userPreferences.lastBackup
+
+    /**
+     * Envoie tout le contenu de l'app à Kazis, qui le conserve.
+     *
+     * C'est la seule copie hors du téléphone des séries et des charges : Health Connect
+     * ne les porte pas.
+     */
+    suspend fun backupToKazis(): KazisBackup {
+        val settings = userPreferences.kazis.first()
+        if (!settings.configured) return KazisBackup.NotConfigured
+        return try {
+            val result = kazis.backup(
+                baseUrl = settings.url,
+                token = settings.token,
+                device = userPreferences.deviceId(),
+                sessions = sessionDao.all(),
+                sets = exerciseSetDao.all(),
+                meals = mealDao.all(),
+            )
+            userPreferences.setLastBackup(System.currentTimeMillis() / 1000)
+            result
+        } catch (_: KazisUnauthorized) {
+            KazisBackup.Unauthorized
+        } catch (e: Exception) {
+            KazisBackup.Failed(e.message ?: "serveur injoignable")
+        }
+    }
+
     // --- Health Connect ------------------------------------------------------
 
     val lastHealthSync: Flow<Long?> = userPreferences.lastHealthSync

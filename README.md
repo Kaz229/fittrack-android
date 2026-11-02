@@ -9,7 +9,8 @@ Deux exceptions au « tout local » :
   [Open Food Facts](https://world.openfoodfacts.org) pour récupérer les valeurs nutritionnelles du
   produit. Le produit reçu est mis en cache localement pour rester consultable hors ligne.
 - **Kazis**, uniquement si tu le configures : les repas dictés à ton assistant personnel sont
-  récupérés depuis ton serveur, sur ton réseau privé.
+  récupérés depuis ton serveur, sur ton réseau privé, et tes séances, séries et repas y sont
+  sauvegardés. C'est la seule copie de tes charges hors du téléphone.
 - **Health Connect**, uniquement si tu l'actives : tes séances et ton journal alimentaire sont
   partagés avec le magasin de santé d'Android, qui les garde sur l'appareil et ne les transmet
   qu'aux applications que tu autorises explicitement.

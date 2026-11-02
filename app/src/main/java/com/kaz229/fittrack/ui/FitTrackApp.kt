@@ -242,6 +242,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     state = kazisState,
                     onSave = viewModel::saveKazisSettings,
                     onFetch = viewModel::fetchKazisMeals,
+                    onBackup = viewModel::backupToKazis,
                 )
             }
             composable(HEALTH) {

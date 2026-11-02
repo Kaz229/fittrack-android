@@ -31,6 +31,14 @@ data class KazisMeal(
     val needsLookup: Boolean get() = calories <= 0 && barcode != null && grams != null
 }
 
+/** Ce que la sauvegarde a donné. */
+sealed interface KazisBackup {
+    data class Success(val sessions: Int, val sets: Int, val meals: Int) : KazisBackup
+    data object NotConfigured : KazisBackup
+    data object Unauthorized : KazisBackup
+    data class Failed(val message: String) : KazisBackup
+}
+
 /** Ce que la récupération a donné, pour l'afficher sans interpréter une exception. */
 sealed interface KazisFetch {
     data class Success(val added: Int, val skipped: Int) : KazisFetch
@@ -53,6 +61,30 @@ class KazisClient {
             val body = request(baseUrl, token, "/v1/meals", "GET", null)
             parseMeals(body)
         }
+
+    /**
+     * Envoie tout le contenu de l'app : séances, séries et journal.
+     *
+     * Rien n'est filtré sur la date. L'historique complet est petit (quelques milliers
+     * de lignes), et le serveur remplace ce qu'il a déjà : une sauvegarde partielle
+     * laisserait des trous après une restauration.
+     */
+    suspend fun backup(
+        baseUrl: String,
+        token: String,
+        device: String,
+        sessions: List<Session>,
+        sets: List<ExerciseSet>,
+        meals: List<Meal>,
+    ): KazisBackup.Success = withContext(Dispatchers.IO) {
+        val payload = JSONObject()
+            .put("device", device)
+            .put("sessions", JSONArray().apply { sessions.forEach { put(it.toJson()) } })
+            .put("sets", JSONArray().apply { sets.forEach { put(it.toJson()) } })
+            .put("meals", JSONArray().apply { meals.forEach { put(it.toJson()) } })
+        request(baseUrl, token, "/v1/fittrack", "POST", payload.toString())
+        KazisBackup.Success(sessions.size, sets.size, meals.size)
+    }
 
     /** Confirme l'enregistrement : les repas sortent de la file côté Kazis. */
     suspend fun acknowledge(baseUrl: String, token: String, ids: List<Long>) {
@@ -122,6 +154,34 @@ class KazisClient {
         private fun Double.orZero(): Double = if (isNaN()) 0.0 else this
     }
 }
+
+private fun Session.toJson(): JSONObject = JSONObject()
+    .put("id", id)
+    .put("kind", kind)
+    .put("day", LocalDate.ofEpochDay(epochDay).toString())
+    .put("activity", activityId ?: JSONObject.NULL)
+    .put("duration_min", durationMinutes)
+    .put("kcal", caloriesBurned)
+    .put("note", note)
+
+private fun ExerciseSet.toJson(): JSONObject = JSONObject()
+    .put("id", id)
+    .put("session_id", sessionId)
+    .put("exercise_id", exerciseId)
+    .put("position", position)
+    .put("reps", reps)
+    .put("weight_kg", weightKg)
+    .put("day", LocalDate.ofEpochDay(epochDay).toString())
+
+private fun Meal.toJson(): JSONObject = JSONObject()
+    .put("id", id)
+    .put("name", name)
+    .put("calories", calories)
+    .put("protein_g", proteinG)
+    .put("carbs_g", carbsG)
+    .put("fat_g", fatG)
+    .put("meal_type", mealType)
+    .put("day", LocalDate.ofEpochDay(epochDay).toString())
 
 /** Jeton refusé : inutile de réessayer sans le corriger. */
 class KazisUnauthorized : Exception("jeton refusé par Kazis")
