@@ -13,6 +13,7 @@ import com.kaz229.fittrack.data.FoodLookup
 import com.kaz229.fittrack.data.HealthConnectAvailability
 import com.kaz229.fittrack.data.KazisBackup
 import com.kaz229.fittrack.data.KazisFetch
+import com.kaz229.fittrack.data.KazisRestore
 import com.kaz229.fittrack.data.KazisSettings
 import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.Labels
@@ -54,6 +55,8 @@ data class KazisState(
     val backingUp: Boolean = false,
     val lastBackupEpochSecond: Long? = null,
     val lastBackupResult: KazisBackup? = null,
+    val restoring: Boolean = false,
+    val lastRestoreResult: KazisRestore? = null,
 )
 
 /** Ce que l'écran Health Connect doit afficher. */
@@ -233,21 +236,27 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
 
     private val backingUp = MutableStateFlow(false)
     private val backupResult = MutableStateFlow<KazisBackup?>(null)
+    private val restoring = MutableStateFlow(false)
+    private val restoreResult = MutableStateFlow<KazisRestore?>(null)
 
     val kazis: StateFlow<KazisState> = combine(
         repository.kazisSettings,
         kazisFetching,
         kazisResult,
-        backingUp,
+        combine(backingUp, restoring, restoreResult) { saving, loading, restored ->
+            Triple(saving, loading, restored)
+        },
         combine(repository.lastKazisBackup, backupResult) { last, result -> last to result },
-    ) { settings, fetching, result, saving, backup ->
+    ) { settings, fetching, result, progress, backup ->
         KazisState(
             settings = settings,
             fetching = fetching,
             lastResult = result,
-            backingUp = saving,
+            backingUp = progress.first,
             lastBackupEpochSecond = backup.first,
             lastBackupResult = backup.second,
+            restoring = progress.second,
+            lastRestoreResult = progress.third,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), KazisState())
 
@@ -258,6 +267,12 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
             repository.fetchKazisMeals(today)
             repository.backupToKazis()
         }
+    }
+
+    fun restoreFromKazis() = viewModelScope.launch {
+        restoring.value = true
+        restoreResult.value = repository.restoreFromKazis()
+        restoring.value = false
     }
 
     fun backupToKazis() = viewModelScope.launch {

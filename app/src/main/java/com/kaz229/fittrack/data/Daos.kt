@@ -36,6 +36,10 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY id")
     suspend fun all(): List<Session>
 
+    /** Réécrit les séances d'une restauration, identifiants d'origine compris. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(sessions: List<Session>)
+
     @Query("SELECT COALESCE(SUM(caloriesBurned), 0) FROM sessions WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>
 
@@ -81,6 +85,9 @@ interface ExerciseSetDao {
     /** Toutes les séries, pour la sauvegarde : c'est ce que rien d'autre ne conserve. */
     @Query("SELECT * FROM exercise_sets ORDER BY id")
     suspend fun all(): List<ExerciseSet>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(sets: List<ExerciseSet>)
 }
 
 @Dao
@@ -101,6 +108,9 @@ interface MealDao {
     /** Tout le journal, pour la sauvegarde. */
     @Query("SELECT * FROM meals ORDER BY id")
     suspend fun all(): List<Meal>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(meals: List<Meal>)
 
     @Query("SELECT COALESCE(SUM(calories), 0) FROM meals WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>

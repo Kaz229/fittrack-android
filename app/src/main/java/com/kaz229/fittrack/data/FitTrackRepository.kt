@@ -315,6 +315,33 @@ class FitTrackRepository(
         }
     }
 
+    /**
+     * Réinjecte la sauvegarde conservée par Kazis.
+     *
+     * Seulement dans une app vide : les identifiants d'origine sont restaurés tels
+     * quels, et ils écraseraient des séances créées depuis. C'est le cas d'un
+     * téléphone neuf, le seul où la restauration a un sens.
+     */
+    suspend fun restoreFromKazis(): KazisRestore {
+        val settings = userPreferences.kazis.first()
+        if (!settings.configured) return KazisRestore.NotConfigured
+        if (sessionDao.all().isNotEmpty() || mealDao.all().isNotEmpty()) {
+            return KazisRestore.Failed("cette application contient déjà des données")
+        }
+        return try {
+            val archive = kazis.archive(settings.url, settings.token)
+            if (archive.isEmpty) return KazisRestore.Empty
+            sessionDao.insertAll(archive.sessions)
+            exerciseSetDao.insertAll(archive.sets)
+            mealDao.insertAll(archive.meals)
+            KazisRestore.Success(archive.sessions.size, archive.sets.size, archive.meals.size)
+        } catch (_: KazisUnauthorized) {
+            KazisRestore.Unauthorized
+        } catch (e: Exception) {
+            KazisRestore.Failed(e.message ?: "serveur injoignable")
+        }
+    }
+
     // --- Health Connect ------------------------------------------------------
 
     val lastHealthSync: Flow<Long?> = userPreferences.lastHealthSync

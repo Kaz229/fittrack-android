@@ -94,6 +94,51 @@ class KazisTest {
     }
 
     @Test
+    fun `une archive est relue avec ses charges`() {
+        val json = """
+            {"device": "pixel", "devices": ["pixel"],
+             "sessions": [{"id": 4, "kind": "gym", "day": "2026-11-02", "activity": null,
+                           "duration_min": 75, "kcal": 492, "note": "Push day"}],
+             "sets": [{"id": 1, "session_id": 4, "exercise_id": "0025", "position": 0,
+                       "reps": 10, "weight_kg": 60.0, "day": "2026-11-02"},
+                      {"id": 2, "session_id": 4, "exercise_id": "0025", "position": 1,
+                       "reps": 8, "weight_kg": 65.0, "day": "2026-11-02"}],
+             "meals": [{"id": 1, "name": "ravioles fraiches", "calories": 420, "protein_g": 24.0,
+                        "carbs_g": 36.0, "fat_g": 21.0, "meal_type": "dejeuner", "day": "2026-11-02"}]}
+        """.trimIndent()
+
+        val archive = KazisClient.parseArchive(json)
+
+        // Les identifiants d'origine sont conservés : les séries pointent vers leur séance
+        assertEquals(4L, archive.sessions.single().id)
+        assertEquals("Push day", archive.sessions.single().note)
+        assertEquals(listOf(10 to 60.0, 8 to 65.0), archive.sets.map { it.reps to it.weightKg })
+        assertTrue(archive.sets.all { it.sessionId == 4L })
+        assertEquals(420, archive.meals.single().calories)
+        assertFalse(archive.isEmpty)
+    }
+
+    @Test
+    fun `une archive vide est reconnue`() {
+        val vide = KazisClient.parseArchive("""{"device": "", "sessions": [], "sets": [], "meals": []}""")
+
+        assertTrue(vide.isEmpty)
+        assertTrue(KazisClient.parseArchive("{}").isEmpty)
+    }
+
+    @Test
+    fun `une ligne illisible n'empeche pas de restaurer le reste`() {
+        val json = """
+            {"sessions": [{"id": 1, "kind": "gym", "day": "jamais"},
+                          {"id": 2, "kind": "gym", "day": "2026-11-02"}],
+             "sets": [], "meals": []}
+        """.trimIndent()
+
+        // Mieux vaut récupérer une séance que d'abandonner toute la restauration
+        assertEquals(listOf(2L), KazisClient.parseArchive(json).sessions.map { it.id })
+    }
+
+    @Test
     fun `les reglages ne sont complets qu'avec l'adresse et le jeton`() {
         assertFalse(KazisSettings().configured)
         assertFalse(KazisSettings(url = "http://100.1.2.3:8765").configured)
