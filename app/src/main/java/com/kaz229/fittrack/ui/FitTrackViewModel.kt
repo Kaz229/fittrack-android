@@ -20,6 +20,9 @@ import com.kaz229.fittrack.data.KazisSettings
 import com.kaz229.fittrack.data.Labels
 import com.kaz229.fittrack.data.MacroGoals
 import com.kaz229.fittrack.data.MacroTotals
+import com.kaz229.fittrack.data.Needs
+import com.kaz229.fittrack.data.NeedsProfile
+import com.kaz229.fittrack.data.computeNeeds
 import com.kaz229.fittrack.data.Meal
 import com.kaz229.fittrack.data.MealType
 import com.kaz229.fittrack.data.Session
@@ -329,6 +332,8 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
             // main, puis la sauvegarde de ce que le téléphone est seul à détenir.
             repository.fetchKazisMeals(today)
             repository.backupToKazis()
+            // La balance écrit dans Health Connect : le poids du profil doit suivre
+            repository.refreshWeightFromHealth()
         }
     }
 
@@ -396,6 +401,27 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
 
     // --- Séances, repas, bilans ---------------------------------------------
 
+    val needsProfile: StateFlow<NeedsProfile> = repository.needsProfile
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NeedsProfile())
+
+    /** Les besoins recalculés à chaque réponse, pour que l'écran montre l'effet tout de suite. */
+    val needs: StateFlow<Needs?> = combine(
+        repository.needsProfile,
+        repository.profile,
+    ) { answers, profile -> computeNeeds(answers, profile.weightKg) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setNeedsProfile(value: NeedsProfile) = viewModelScope.launch {
+        repository.setNeedsProfile(value)
+    }
+
+    fun applyComputedNeeds() = viewModelScope.launch {
+        needs.value?.let { repository.applyComputedNeeds(it) }
+    }
+
+    /** Relit le poids écrit par la balance dans Health Connect. */
+    fun refreshWeightFromHealth() = viewModelScope.launch { repository.refreshWeightFromHealth() }
+
     val theme: StateFlow<ThemeChoice> = repository.theme
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeChoice.SYSTEM)
 
@@ -450,6 +476,10 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun deleteMeal(meal: Meal) = viewModelScope.launch { repository.deleteMeal(meal) }
+
+    fun moveMeal(meal: Meal, mealType: MealType) = viewModelScope.launch {
+        repository.moveMeal(meal, mealType)
+    }
 
     fun setWeight(weightKg: Double) = viewModelScope.launch { repository.setWeight(weightKg) }
 

@@ -28,6 +28,33 @@ class FitTrackRepository(
 
     val theme: Flow<ThemeChoice> = userPreferences.theme
 
+    val needsProfile: Flow<NeedsProfile> = userPreferences.needsProfile
+
+    suspend fun setNeedsProfile(value: NeedsProfile) = userPreferences.setNeedsProfile(value)
+
+    /**
+     * Applique l'objectif et les macros calculés à partir du questionnaire.
+     *
+     * Rien n'est recalculé en silence : l'utilisateur voit les chiffres avant de valider.
+     */
+    suspend fun applyComputedNeeds(needs: Needs) {
+        userPreferences.setDailyCalorieGoal(needs.target)
+        userPreferences.setMacroGoals(needs.macros)
+    }
+
+    /**
+     * Reprend le poids de Health Connect, écrit par la balance.
+     *
+     * Renseigné chaque pesée par l'application de la balance, il est plus à jour que
+     * celui saisi à la main — et c'est lui qui pilote le calcul des besoins.
+     */
+    suspend fun refreshWeightFromHealth(): Double? {
+        val weight = healthConnect?.latestWeightKg() ?: return null
+        if (weight <= 0) return null
+        userPreferences.setWeight(weight)
+        return weight
+    }
+
     suspend fun setTheme(choice: ThemeChoice) = userPreferences.setTheme(choice)
 
     // --- Séances -------------------------------------------------------------
@@ -163,6 +190,12 @@ class FitTrackRepository(
     }
 
     suspend fun deleteMeal(meal: Meal) = mealDao.delete(meal)
+
+    /** Range une ligne sous un autre moment de la journée, sans la ressaisir. */
+    suspend fun moveMeal(meal: Meal, mealType: MealType) {
+        if (meal.mealType == mealType.id) return
+        mealDao.update(meal.copy(mealType = mealType.id))
+    }
 
     /** Réinscrit un aliment déjà saisi, à la date du jour et au repas choisi. */
     suspend fun repeatMeal(meal: Meal, mealType: MealType, date: LocalDate = LocalDate.now()) {

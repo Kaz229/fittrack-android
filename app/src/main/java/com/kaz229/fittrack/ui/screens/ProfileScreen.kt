@@ -36,6 +36,7 @@ fun ProfileScreen(
     onSave: (weightKg: Double, goal: Int, macroGoals: MacroGoals) -> Unit,
     onOpenHealthConnect: () -> Unit,
     onOpenKazis: () -> Unit,
+    onOpenNeeds: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var weight by remember(profile.weightKg) {
@@ -76,6 +77,18 @@ fun ProfileScreen(
             text = "Mon profil",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+        )
+        Button(
+            onClick = onOpenNeeds,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Calculer mes objectifs")
+        }
+        Text(
+            text = "Quelques questions sur ta semaine, et l'objectif calorique comme les " +
+                "macros se calculent tout seuls.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(text = "Apparence", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

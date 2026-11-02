@@ -103,6 +103,9 @@ interface MealDao {
     @Insert
     suspend fun insert(meal: Meal): Long
 
+    @Update
+    suspend fun update(meal: Meal)
+
     @Delete
     suspend fun delete(meal: Meal)
 

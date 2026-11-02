@@ -24,12 +24,14 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +61,7 @@ import com.kaz229.fittrack.ui.screens.HealthConnectScreen
 import com.kaz229.fittrack.ui.screens.HomeScreen
 import com.kaz229.fittrack.ui.screens.KazisScreen
 import com.kaz229.fittrack.ui.screens.MealsScreen
+import com.kaz229.fittrack.ui.screens.NeedsScreen
 import com.kaz229.fittrack.ui.screens.ProfileScreen
 import com.kaz229.fittrack.ui.screens.ScanScreen
 import com.kaz229.fittrack.ui.screens.SessionDetailScreen
@@ -83,6 +86,7 @@ private const val SCAN = "scan"
 private const val HEALTH = "health"
 private const val KAZIS = "kazis"
 private const val FOOD_SEARCH = "food-search"
+private const val NEEDS = "needs"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,6 +126,8 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val kazisState by viewModel.kazis.collectAsStateWithLifecycle()
     val foodSearchState by viewModel.foodSearch.collectAsStateWithLifecycle()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val needsAnswers by viewModel.needsProfile.collectAsStateWithLifecycle()
+    val needs by viewModel.needs.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val exercisesById by viewModel.exercisesById.collectAsStateWithLifecycle()
     val openSession by viewModel.openSession.collectAsStateWithLifecycle()
@@ -137,6 +143,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
         HEALTH -> "Health Connect"
         KAZIS -> "Repas dictés"
         FOOD_SEARCH -> "Chercher un aliment"
+        NEEDS -> "Mes besoins"
         else -> currentTab?.label ?: "FitTrack"
     }
 
@@ -145,6 +152,15 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
             TopAppBar(
                 // Les onglets affichent leur propre en-tête : un titre ici ferait doublon
                 title = { if (!isTopLevel) Text(title) },
+                // Sur un onglet la barre ne porte plus que l'accès au profil : lui laisser
+                // la couleur de surface dessinait un bandeau en haut de l'écran.
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = if (isTopLevel) {
+                        MaterialTheme.colorScheme.background
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                ),
                 navigationIcon = {
                     if (!isTopLevel) {
                         IconButton(onClick = { navController.popBackStack() }) {
@@ -274,6 +290,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     macros = macros,
                     macroGoals = profile.macroGoals,
                     onDelete = viewModel::deleteMeal,
+                    onMove = viewModel::moveMeal,
                 )
             }
             composable(FOOD_SEARCH) {
@@ -288,6 +305,19 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                         viewModel.selectSearchedProduct(product)
                         navController.navigate(SCAN)
                     },
+                )
+            }
+            composable(NEEDS) {
+                NeedsScreen(
+                    answers = needsAnswers,
+                    needs = needs,
+                    weightKg = profile.weightKg,
+                    onChange = viewModel::setNeedsProfile,
+                    onApply = {
+                        viewModel.applyComputedNeeds()
+                        navController.popBackStack()
+                    },
+                    onRefreshWeight = viewModel::refreshWeightFromHealth,
                 )
             }
             composable(KAZIS) {
@@ -349,6 +379,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     onThemeChange = viewModel::setTheme,
                     onOpenHealthConnect = { navController.navigate(HEALTH) },
                     onOpenKazis = { navController.navigate(KAZIS) },
+                    onOpenNeeds = { navController.navigate(NEEDS) },
                     onSave = { weight, goal, macroGoals ->
                         viewModel.setWeight(weight)
                         viewModel.setDailyCalorieGoal(goal)
