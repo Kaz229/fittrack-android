@@ -12,6 +12,7 @@ import java.time.LocalDate
  * ni Room ni DataStore : le jour où le stockage change, seul ce fichier bouge.
  */
 class FitTrackRepository(
+    private val context: Context? = null,
     private val sessionDao: SessionDao,
     private val exerciseSetDao: ExerciseSetDao,
     private val mealDao: MealDao,
@@ -40,14 +41,17 @@ class FitTrackRepository(
         }
 
     /** Crée une séance salle vide et renvoie son identifiant. */
-    suspend fun startGymSession(date: LocalDate = LocalDate.now()): Long =
-        sessionDao.insert(
+    suspend fun startGymSession(date: LocalDate = LocalDate.now()): Long {
+        val id = sessionDao.insert(
             Session(
                 kind = SessionKind.GYM.id,
                 epochDay = date.toEpochDay(),
                 finished = false,
             ),
         )
+        context?.let { SessionReminder.schedule(it, id) }
+        return id
+    }
 
     /**
      * Clôture une séance salle : la durée saisie sert à estimer les calories brûlées
@@ -65,6 +69,7 @@ class FitTrackRepository(
                 finished = true,
             ),
         )
+        context?.let { SessionReminder.cancel(it, sessionId) }
     }
 
     /** Enregistre une séance cardio ou un sport, calories estimées immédiatement. */
@@ -89,7 +94,10 @@ class FitTrackRepository(
         )
     }
 
-    suspend fun deleteSession(session: Session) = sessionDao.delete(session)
+    suspend fun deleteSession(session: Session) {
+        context?.let { SessionReminder.cancel(it, session.id) }
+        sessionDao.delete(session)
+    }
 
     // --- Séries --------------------------------------------------------------
 
@@ -105,6 +113,8 @@ class FitTrackRepository(
                 epochDay = session.epochDay,
             ),
         )
+        // Une série repousse le rappel : seul le silence doit le déclencher
+        context?.let { SessionReminder.schedule(it, sessionId) }
     }
 
     suspend fun deleteSet(set: ExerciseSet) = exerciseSetDao.delete(set)
@@ -429,6 +439,7 @@ class FitTrackRepository(
             instance ?: run {
                 val db = FitTrackDatabase.get(context)
                 FitTrackRepository(
+                    context = context.applicationContext,
                     sessionDao = db.sessionDao(),
                     exerciseSetDao = db.exerciseSetDao(),
                     mealDao = db.mealDao(),

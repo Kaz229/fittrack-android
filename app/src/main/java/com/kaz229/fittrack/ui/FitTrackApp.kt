@@ -3,6 +3,11 @@ package com.kaz229.fittrack.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
@@ -32,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -83,6 +90,18 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val currentTab = Tab.entries.firstOrNull { tab ->
         backStackEntry?.destination?.hierarchy?.any { it.route == tab.route } == true
     }
+
+    // Le rappel de séance oubliée ne sert à rien sans autorisation de notifier :
+    // on la demande au moment où elle prend son sens, en démarrant une séance.
+    val context = LocalContext.current
+    val notificationsGranted = remember {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
 
     var showCardioDialog by remember { mutableStateOf(false) }
     var showMealDialog by remember { mutableStateOf(false) }
@@ -166,6 +185,9 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     }
                     ExtendedFloatingActionButton(
                         onClick = {
+                            if (!notificationsGranted) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
                             viewModel.startGymSession { navController.navigate(SESSION_DETAIL) }
                         },
                         icon = { Icon(Icons.Filled.Add, contentDescription = null) },

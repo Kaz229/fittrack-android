@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Interrogation d'Open Food Facts : seul le code-barres scanné sort du téléphone. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Rappel quand une séance reste ouverte sans qu'on y ajoute rien. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature
         android:name="android.hardware.camera.any"
