@@ -144,6 +144,12 @@ fun HealthConnectScreen(
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
+            text = "Les séances enregistrées par une autre application (Lyfta, une montre…) " +
+                "sont reprises dans ton historique, sans doublon : chacune garde son " +
+                "identifiant d'origine.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
             text = "FitTrack ne connaît que le jour d'une séance, jamais son heure. Les " +
                 "séances sont donc placées en fin d'après-midi et les repas à l'heure " +
                 "habituelle de leur catégorie — en reculant ce qu'il faut pour qu'un " +
@@ -180,6 +186,12 @@ private fun ResultCard(result: SyncResult, onUseWeight: (Double) -> Unit) {
                         "de repas envoyées.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                if (result.imported > 0) {
+                    Text(
+                        text = "${result.imported} séance(s) reprise(s) d'une autre application.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 result.weightKg?.let { weight ->
                     Text(
                         text = "Poids trouvé dans Health Connect : ${formatWeight(weight)}.",

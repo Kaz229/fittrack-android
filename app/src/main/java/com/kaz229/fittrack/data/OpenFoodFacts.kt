@@ -60,8 +60,36 @@ class OpenFoodFactsClient(private val baseUrl: String = BASE_URL) {
         }
     }
 
+    /**
+     * Cherche un produit par son nom.
+     *
+     * L'ancienne recherche (`/cgi/search.pl`) est régulièrement hors service ; celle-ci
+     * passe par le service dédié, qui rend directement les valeurs nutritionnelles.
+     */
+    suspend fun search(query: String, limit: Int = 8): List<FoodProduct> =
+        withContext(Dispatchers.IO) {
+            val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+            val url = "$SEARCH_URL/search?q=$encoded&page_size=$limit&fields=$SEARCH_FIELDS"
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", USER_AGENT)
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+            }
+            try {
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext emptyList()
+                parseSearch(connection.inputStream.bufferedReader().use { it.readText() })
+            } catch (_: Exception) {
+                emptyList()
+            } finally {
+                connection.disconnect()
+            }
+        }
+
     companion object {
         private const val BASE_URL = "https://world.openfoodfacts.org"
+        private const val SEARCH_URL = "https://search.openfoodfacts.org"
+        private const val SEARCH_FIELDS = "code,product_name,brands,nutriments"
         private const val TIMEOUT_MS = 8_000
         private const val FIELDS = "code,product_name,product_name_fr,brands,serving_size,nutriments"
 
@@ -103,6 +131,31 @@ class OpenFoodFactsClient(private val baseUrl: String = BASE_URL) {
                 ),
                 fromCache = false,
             )
+        }
+
+        /**
+         * Lit une réponse du service de recherche. Les produits sans calories ou sans nom
+         * sont écartés : ils ne peuvent rien apporter au journal.
+         */
+        fun parseSearch(json: String): List<FoodProduct> {
+            val hits = JSONObject(json).optJSONArray("hits") ?: return emptyList()
+            return (0 until hits.length()).mapNotNull { index ->
+                val item = hits.optJSONObject(index) ?: return@mapNotNull null
+                val nutriments = item.optJSONObject("nutriments") ?: return@mapNotNull null
+                val kcal = nutriments.optDoubleOrNull("energy-kcal_100g") ?: return@mapNotNull null
+                val name = item.optStringOrNull("product_name") ?: return@mapNotNull null
+                FoodProduct(
+                    barcode = item.optString("code"),
+                    name = name,
+                    // « brands » est ici un tableau, et une chaîne dans l'autre API
+                    brands = item.optJSONArray("brands")?.optString(0)?.trim()
+                        ?: item.optStringOrNull("brands")?.substringBefore(',')?.trim() ?: "",
+                    kcalPer100g = kcal,
+                    proteinPer100g = nutriments.optDoubleOrNull("proteins_100g") ?: 0.0,
+                    carbsPer100g = nutriments.optDoubleOrNull("carbohydrates_100g") ?: 0.0,
+                    fatPer100g = nutriments.optDoubleOrNull("fat_100g") ?: 0.0,
+                )
+            }
         }
 
         /** `optDouble` renvoie NaN pour un champ absent : on préfère un null explicite. */

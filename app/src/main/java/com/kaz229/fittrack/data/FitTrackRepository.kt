@@ -12,6 +12,7 @@ import java.time.LocalDate
  * ni Room ni DataStore : le jour où le stockage change, seul ce fichier bouge.
  */
 class FitTrackRepository(
+    private val context: Context? = null,
     private val sessionDao: SessionDao,
     private val exerciseSetDao: ExerciseSetDao,
     private val mealDao: MealDao,
@@ -40,14 +41,17 @@ class FitTrackRepository(
         }
 
     /** Crée une séance salle vide et renvoie son identifiant. */
-    suspend fun startGymSession(date: LocalDate = LocalDate.now()): Long =
-        sessionDao.insert(
+    suspend fun startGymSession(date: LocalDate = LocalDate.now()): Long {
+        val id = sessionDao.insert(
             Session(
                 kind = SessionKind.GYM.id,
                 epochDay = date.toEpochDay(),
                 finished = false,
             ),
         )
+        context?.let { SessionReminder.schedule(it, id) }
+        return id
+    }
 
     /**
      * Clôture une séance salle : la durée saisie sert à estimer les calories brûlées
@@ -65,6 +69,7 @@ class FitTrackRepository(
                 finished = true,
             ),
         )
+        context?.let { SessionReminder.cancel(it, sessionId) }
     }
 
     /** Enregistre une séance cardio ou un sport, calories estimées immédiatement. */
@@ -89,7 +94,10 @@ class FitTrackRepository(
         )
     }
 
-    suspend fun deleteSession(session: Session) = sessionDao.delete(session)
+    suspend fun deleteSession(session: Session) {
+        context?.let { SessionReminder.cancel(it, session.id) }
+        sessionDao.delete(session)
+    }
 
     // --- Séries --------------------------------------------------------------
 
@@ -105,6 +113,8 @@ class FitTrackRepository(
                 epochDay = session.epochDay,
             ),
         )
+        // Une série repousse le rappel : seul le silence doit le déclencher
+        context?.let { SessionReminder.schedule(it, sessionId) }
     }
 
     suspend fun deleteSet(set: ExerciseSet) = exerciseSetDao.delete(set)
@@ -149,6 +159,33 @@ class FitTrackRepository(
     }
 
     suspend fun deleteMeal(meal: Meal) = mealDao.delete(meal)
+
+    /** Réinscrit un aliment déjà saisi, à la date du jour et au repas choisi. */
+    suspend fun repeatMeal(meal: Meal, mealType: MealType, date: LocalDate = LocalDate.now()) {
+        mealDao.insert(
+            meal.copy(id = 0, mealType = mealType.id, epochDay = date.toEpochDay()),
+        )
+    }
+
+    // --- Recherche d'aliments ------------------------------------------------
+
+    /**
+     * Ce que la recherche propose : d'abord ce qui est déjà connu du téléphone,
+     * ensuite seulement ce qu'Open Food Facts renvoie.
+     *
+     * L'historique passe devant parce qu'on remange surtout les mêmes choses, et qu'il
+     * répond sans réseau. Les deux listes sont rendues séparément : recopier un repas
+     * déjà saisi et peser un produit ne sont pas le même geste.
+     */
+    suspend fun searchFoods(query: String): FoodSearch {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) return FoodSearch()
+        val history = mealDao.searchHistory(trimmed)
+        val cached = foodProductDao.search(trimmed)
+        val remote = openFoodFacts.search(trimmed)
+            .filter { product -> cached.none { it.barcode == product.barcode } }
+        return FoodSearch(history = history, products = cached + remote)
+    }
 
     // --- Aliments scannés ----------------------------------------------------
 
@@ -315,6 +352,33 @@ class FitTrackRepository(
         }
     }
 
+    /**
+     * Réinjecte la sauvegarde conservée par Kazis.
+     *
+     * Seulement dans une app vide : les identifiants d'origine sont restaurés tels
+     * quels, et ils écraseraient des séances créées depuis. C'est le cas d'un
+     * téléphone neuf, le seul où la restauration a un sens.
+     */
+    suspend fun restoreFromKazis(): KazisRestore {
+        val settings = userPreferences.kazis.first()
+        if (!settings.configured) return KazisRestore.NotConfigured
+        if (sessionDao.all().isNotEmpty() || mealDao.all().isNotEmpty()) {
+            return KazisRestore.Failed("cette application contient déjà des données")
+        }
+        return try {
+            val archive = kazis.archive(settings.url, settings.token)
+            if (archive.isEmpty) return KazisRestore.Empty
+            sessionDao.insertAll(archive.sessions)
+            exerciseSetDao.insertAll(archive.sets)
+            mealDao.insertAll(archive.meals)
+            KazisRestore.Success(archive.sessions.size, archive.sets.size, archive.meals.size)
+        } catch (_: KazisUnauthorized) {
+            KazisRestore.Unauthorized
+        } catch (e: Exception) {
+            KazisRestore.Failed(e.message ?: "serveur injoignable")
+        }
+    }
+
     // --- Health Connect ------------------------------------------------------
 
     val lastHealthSync: Flow<Long?> = userPreferences.lastHealthSync
@@ -324,6 +388,42 @@ class FitTrackRepository(
 
     suspend fun healthConnectPermissionsGranted(): Boolean =
         healthConnect?.hasAllPermissions() ?: false
+
+    /**
+     * Reprend les séances enregistrées par d'autres applications (Lyfta, montre…).
+     *
+     * Les calories ne sont pas recalculées : celles de l'application d'origine valent
+     * mieux qu'une estimation MET faite sur une durée seule. Quand elle n'en donne pas,
+     * on retombe sur la formule MET, comme pour une séance saisie ici.
+     */
+    suspend fun importHealthSessions(today: LocalDate = LocalDate.now()): Int {
+        val manager = healthConnect ?: return 0
+        val known = sessionDao.importedExternalIds().toSet()
+        val weight = userPreferences.profile.first().weightKg
+        var imported = 0
+        for (session in manager.foreignSessions(today, SYNC_DAYS)) {
+            if (session.id in known) continue
+            val activity = if (session.isStrength) {
+                Activities.strengthTraining
+            } else {
+                Activities.byId("autre")
+            }
+            sessionDao.insert(
+                Session(
+                    kind = if (session.isStrength) SessionKind.GYM.id else SessionKind.CARDIO.id,
+                    epochDay = session.day.toEpochDay(),
+                    activityId = if (session.isStrength) null else activity.id,
+                    durationMinutes = session.minutes,
+                    caloriesBurned = Activities.caloriesBurned(activity, session.minutes, weight),
+                    note = session.title ?: "Importé de ${session.source.substringAfterLast('.')}",
+                    finished = true,
+                    externalId = session.id,
+                ),
+            )
+            imported++
+        }
+        return imported
+    }
 
     /**
      * Exporte les séances et repas du dernier mois, et relit le poids le plus récent.
@@ -341,6 +441,8 @@ class FitTrackRepository(
         )
         if (result is SyncResult.Success) {
             userPreferences.setLastHealthSync(System.currentTimeMillis() / 1000)
+            // Dans la foulée : ce que les autres applications ont écrit de leur côté
+            return result.copy(imported = importHealthSessions(today))
         }
         return result
     }
@@ -364,6 +466,7 @@ class FitTrackRepository(
             instance ?: run {
                 val db = FitTrackDatabase.get(context)
                 FitTrackRepository(
+                    context = context.applicationContext,
                     sessionDao = db.sessionDao(),
                     exerciseSetDao = db.exerciseSetDao(),
                     mealDao = db.mealDao(),

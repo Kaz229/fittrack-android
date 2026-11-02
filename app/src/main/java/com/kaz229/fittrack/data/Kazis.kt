@@ -31,6 +31,24 @@ data class KazisMeal(
     val needsLookup: Boolean get() = calories <= 0 && barcode != null && grams != null
 }
 
+/** Ce que la restauration a donné. */
+sealed interface KazisRestore {
+    data class Success(val sessions: Int, val sets: Int, val meals: Int) : KazisRestore
+    data object Empty : KazisRestore
+    data object NotConfigured : KazisRestore
+    data object Unauthorized : KazisRestore
+    data class Failed(val message: String) : KazisRestore
+}
+
+/** Le contenu rendu par Kazis, prêt à être réécrit dans la base. */
+data class KazisArchive(
+    val sessions: List<Session>,
+    val sets: List<ExerciseSet>,
+    val meals: List<Meal>,
+) {
+    val isEmpty: Boolean get() = sessions.isEmpty() && sets.isEmpty() && meals.isEmpty()
+}
+
 /** Ce que la sauvegarde a donné. */
 sealed interface KazisBackup {
     data class Success(val sessions: Int, val sets: Int, val meals: Int) : KazisBackup
@@ -85,6 +103,10 @@ class KazisClient {
         request(baseUrl, token, "/v1/fittrack", "POST", payload.toString())
         KazisBackup.Success(sessions.size, sets.size, meals.size)
     }
+
+    /** Récupère la sauvegarde conservée par Kazis. */
+    suspend fun archive(baseUrl: String, token: String): KazisArchive =
+        withContext(Dispatchers.IO) { parseArchive(request(baseUrl, token, "/v1/fittrack", "GET", null)) }
 
     /** Confirme l'enregistrement : les repas sortent de la file côté Kazis. */
     suspend fun acknowledge(baseUrl: String, token: String, ids: List<Long>) {
@@ -152,6 +174,56 @@ class KazisClient {
         }
 
         private fun Double.orZero(): Double = if (isNaN()) 0.0 else this
+
+        /** Relit ce que `GET /v1/fittrack` a rendu. Fonction pure, testable sans réseau. */
+        fun parseArchive(json: String): KazisArchive {
+            val root = JSONObject(json)
+            return KazisArchive(
+                sessions = root.optJSONArray("sessions").map { item ->
+                    Session(
+                        id = item.optLong("id"),
+                        kind = item.optString("kind"),
+                        epochDay = LocalDate.parse(item.optString("day")).toEpochDay(),
+                        activityId = item.optString("activity").takeIf { it.isNotBlank() && it != "null" },
+                        durationMinutes = item.optInt("duration_min"),
+                        caloriesBurned = item.optInt("kcal"),
+                        note = item.optString("note"),
+                        finished = true,
+                    )
+                },
+                sets = root.optJSONArray("sets").map { item ->
+                    ExerciseSet(
+                        id = item.optLong("id"),
+                        sessionId = item.optLong("session_id"),
+                        exerciseId = item.optString("exercise_id"),
+                        position = item.optInt("position"),
+                        reps = item.optInt("reps"),
+                        weightKg = item.optDouble("weight_kg", 0.0).orZero(),
+                        epochDay = LocalDate.parse(item.optString("day")).toEpochDay(),
+                    )
+                },
+                meals = root.optJSONArray("meals").map { item ->
+                    Meal(
+                        id = item.optLong("id"),
+                        name = item.optString("name"),
+                        calories = item.optInt("calories"),
+                        mealType = item.optString("meal_type"),
+                        epochDay = LocalDate.parse(item.optString("day")).toEpochDay(),
+                        proteinG = item.optDouble("protein_g", 0.0).orZero(),
+                        carbsG = item.optDouble("carbs_g", 0.0).orZero(),
+                        fatG = item.optDouble("fat_g", 0.0).orZero(),
+                    )
+                },
+            )
+        }
+
+        /** Une ligne illisible est ignorée : mieux vaut restaurer le reste que rien. */
+        private fun <T> JSONArray?.map(build: (JSONObject) -> T): List<T> {
+            if (this == null) return emptyList()
+            return (0 until length()).mapNotNull { index ->
+                optJSONObject(index)?.let { runCatching { build(it) }.getOrNull() }
+            }
+        }
     }
 }
 

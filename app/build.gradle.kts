@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.androidx.health.connect.client)
+    implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

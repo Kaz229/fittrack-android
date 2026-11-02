@@ -70,6 +70,19 @@ data class MacroTotals(
     val caloriesFromMacros: Int get() = (proteinG * 4 + carbsG * 4 + fatG * 9).roundToInt()
 }
 
+/**
+ * Résultat d'une recherche d'aliment.
+ *
+ * [history] contient des lignes déjà saisies, à recopier telles quelles ; [products]
+ * des produits avec leurs valeurs pour 100 g, dont il faut peser la quantité.
+ */
+data class FoodSearch(
+    val history: List<Meal> = emptyList(),
+    val products: List<FoodProduct> = emptyList(),
+) {
+    val isEmpty: Boolean get() = history.isEmpty() && products.isEmpty()
+}
+
 /** Objectifs journaliers de macros, en grammes. */
 data class MacroGoals(
     val proteinG: Int = DEFAULT_PROTEIN_G,

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.kaz229.fittrack.data.KazisBackup
 import com.kaz229.fittrack.data.KazisFetch
+import com.kaz229.fittrack.data.KazisRestore
 import com.kaz229.fittrack.data.KazisSettings
 import com.kaz229.fittrack.ui.KazisState
 
@@ -42,6 +43,7 @@ fun KazisScreen(
     onSave: (KazisSettings) -> Unit,
     onFetch: () -> Unit,
     onBackup: () -> Unit,
+    onRestore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var url by remember(state.settings.url) { mutableStateOf(state.settings.url) }
@@ -120,6 +122,18 @@ fun KazisScreen(
             ) { Text(if (state.backingUp) "Sauvegarde…" else "Sauvegarder maintenant") }
             state.lastBackupEpochSecond?.let { LastBackupLine(it) }
             state.lastBackupResult?.let { BackupCard(it) }
+
+            OutlinedButton(
+                onClick = onRestore,
+                enabled = !state.restoring,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (state.restoring) "Restauration…" else "Restaurer depuis Kazis") }
+            Text(
+                text = "À n'utiliser que sur une application vide, après une réinstallation " +
+                    "ou un changement de téléphone.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            state.lastRestoreResult?.let { RestoreCard(it) }
         }
 
         HorizontalDivider()
@@ -171,6 +185,36 @@ private fun BackupCard(result: KazisBackup) {
 
         is KazisBackup.Failed ->
             "Sauvegarde impossible" to "${result.message}. Tes données restent sur le téléphone."
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(text = title, fontWeight = FontWeight.SemiBold)
+            Text(text = body, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun RestoreCard(result: KazisRestore) {
+    val (title, body) = when (result) {
+        is KazisRestore.Success ->
+            "Restauré" to "${result.sessions} séance(s), ${result.sets} série(s) et " +
+                "${result.meals} ligne(s) de repas sont revenues."
+
+        KazisRestore.Empty ->
+            "Rien à restaurer" to "Kazis ne conserve aucune sauvegarde pour l'instant."
+
+        KazisRestore.NotConfigured ->
+            "À configurer" to "Renseigne l'adresse du serveur et le jeton."
+
+        KazisRestore.Unauthorized ->
+            "Jeton refusé" to "Le serveur n'a pas accepté ce jeton."
+
+        is KazisRestore.Failed ->
+            "Restauration impossible" to result.message.replaceFirstChar { it.uppercase() } + "."
     }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(

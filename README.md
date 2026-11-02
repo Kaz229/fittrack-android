@@ -27,9 +27,16 @@ Rien d'autre ne sort du téléphone, et les deux restent facultatifs.
 - **Progression** : chaque fiche d'exercice affiche ton **record personnel** et tout l'historique
   de tes séries sur cet exercice.
 - **Cardio / sport** : tapis, rameur, foot… une activité et une durée suffisent.
+- **Séance oubliée** : au bout de 10 minutes sans nouvelle série, l'app demande si tu es
+  toujours là — une séance laissée ouverte fausse sa durée et ses calories.
+- **Séances venues d'ailleurs** : celles enregistrées dans une autre application (Lyfta, une
+  montre) sont reprises depuis Health Connect, sans doublon.
 - **Repas au code-barres** : on scanne le produit, l'app récupère ses valeurs nutritionnelles chez
   Open Food Facts, on saisit la quantité en grammes et l'apport est calculé au prorata —
   calories, protéines, glucides, lipides.
+- **Recherche par nom** : « sky » retrouve le skyr mangé il y a deux jours, à réinscrire en un
+  tap, puis propose les produits d'Open Food Facts. L'historique passe devant : on remange
+  surtout les mêmes choses, et il répond sans réseau.
 - **Saisie libre** : pour la cuisine maison ou un produit absent de la base, avec macros optionnelles.
 - **Accueil** : bilan calorique du jour (ingéré / brûlé / net), macros face aux objectifs, volume
   soulevé, progression vers l'objectif, historique des 7 derniers jours.
@@ -58,7 +65,8 @@ corde à sauter 11,0 · rameur 7,0…). C'est une estimation, pas une mesure mé
 | Catalogue | JSON embarqué dans les assets, chargé en mémoire au lancement |
 | Scan | CameraX + ML Kit (barcode-scanning groupé, fonctionne sans Play Services) |
 | Nutrition | API Open Food Facts v2 en lecture, `HttpURLConnection`, cache Room |
-| Santé | Health Connect (écriture séances, calories et nutrition ; lecture du poids) |
+| Santé | Health Connect (écriture séances, calories et nutrition ; lecture du poids et des séances) |
+| Rappels | WorkManager |
 | Repas dictés | file récupérée sur le serveur Kazis (réseau privé, jeton partagé) |
 | Build | Gradle 8.11 + AGP 8.7, `minSdk 26`, `targetSdk 35` |
 
@@ -99,7 +107,8 @@ app/src/main/
     │   ├── Nutrition.kt           # FoodProduct, portions, macros et objectifs
     │   ├── OpenFoodFacts.kt       # client de lecture de l'API + parsing
     │   ├── HealthConnect.kt       # export des séances et repas, lecture du poids
-    │   ├── Kazis.kt               # récupération des repas dictés à l'assistant
+    │   ├── Kazis.kt               # repas dictés, sauvegarde et restauration
+    │   ├── SessionReminder.kt     # rappel quand une séance reste ouverte
     │   ├── Exercise.kt            # exercice du catalogue + libellés FR
     │   ├── ExerciseCatalog.kt     # chargement, recherche, filtres
     │   ├── Activities.kt          # activités cardio (MET) et calcul des calories

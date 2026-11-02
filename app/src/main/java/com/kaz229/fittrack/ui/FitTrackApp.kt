@@ -3,6 +3,11 @@ package com.kaz229.fittrack.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
@@ -13,6 +18,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
@@ -32,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,6 +54,7 @@ import com.kaz229.fittrack.ui.screens.AddCardioDialog
 import com.kaz229.fittrack.ui.screens.AddMealDialog
 import com.kaz229.fittrack.ui.screens.ExerciseDetailScreen
 import com.kaz229.fittrack.ui.screens.ExercisesScreen
+import com.kaz229.fittrack.ui.screens.FoodSearchScreen
 import com.kaz229.fittrack.ui.screens.HealthConnectScreen
 import com.kaz229.fittrack.ui.screens.HomeScreen
 import com.kaz229.fittrack.ui.screens.KazisScreen
@@ -62,9 +71,9 @@ private enum class Tab(
     val icon: ImageVector,
 ) {
     HOME("home", "Accueil", Icons.Filled.Home),
+    MEALS("meals", "Repas", Icons.Filled.Restaurant),
     SESSIONS("sessions", "Séances", Icons.Filled.FitnessCenter),
     EXERCISES("exercises", "Exercices", Icons.Filled.MenuBook),
-    MEALS("meals", "Repas", Icons.Filled.Restaurant),
 }
 
 private const val SESSION_DETAIL = "session"
@@ -73,6 +82,7 @@ private const val PROFILE = "profile"
 private const val SCAN = "scan"
 private const val HEALTH = "health"
 private const val KAZIS = "kazis"
+private const val FOOD_SEARCH = "food-search"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +93,18 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val currentTab = Tab.entries.firstOrNull { tab ->
         backStackEntry?.destination?.hierarchy?.any { it.route == tab.route } == true
     }
+
+    // Le rappel de séance oubliée ne sert à rien sans autorisation de notifier :
+    // on la demande au moment où elle prend son sens, en démarrant une séance.
+    val context = LocalContext.current
+    val notificationsGranted = remember {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
 
     var showCardioDialog by remember { mutableStateOf(false) }
     var showMealDialog by remember { mutableStateOf(false) }
@@ -98,6 +120,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val scanState by viewModel.scan.collectAsStateWithLifecycle()
     val healthState by viewModel.health.collectAsStateWithLifecycle()
     val kazisState by viewModel.kazis.collectAsStateWithLifecycle()
+    val foodSearchState by viewModel.foodSearch.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val exercisesById by viewModel.exercisesById.collectAsStateWithLifecycle()
     val openSession by viewModel.openSession.collectAsStateWithLifecycle()
@@ -112,6 +135,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
         SCAN -> "Scanner un produit"
         HEALTH -> "Health Connect"
         KAZIS -> "Repas dictés"
+        FOOD_SEARCH -> "Chercher un aliment"
         else -> currentTab?.label ?: "FitTrack"
     }
 
@@ -166,6 +190,9 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     }
                     ExtendedFloatingActionButton(
                         onClick = {
+                            if (!notificationsGranted) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
                             viewModel.startGymSession { navController.navigate(SESSION_DETAIL) }
                         },
                         icon = { Icon(Icons.Filled.Add, contentDescription = null) },
@@ -178,6 +205,14 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                 ) {
                     SmallFloatingActionButton(onClick = { showMealDialog = true }) {
                         Icon(Icons.Filled.Add, contentDescription = "Saisir un aliment à la main")
+                    }
+                    SmallFloatingActionButton(
+                        onClick = {
+                            viewModel.onFoodQueryChange("")
+                            navController.navigate(FOOD_SEARCH)
+                        },
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = "Chercher un aliment")
                     }
                     ExtendedFloatingActionButton(
                         onClick = {
@@ -237,12 +272,27 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     onDelete = viewModel::deleteMeal,
                 )
             }
+            composable(FOOD_SEARCH) {
+                FoodSearchScreen(
+                    state = foodSearchState,
+                    onQueryChange = viewModel::onFoodQueryChange,
+                    onRepeat = { meal, mealType ->
+                        viewModel.repeatMeal(meal, mealType)
+                        navController.popBackStack()
+                    },
+                    onPickProduct = { product ->
+                        viewModel.selectSearchedProduct(product)
+                        navController.navigate(SCAN)
+                    },
+                )
+            }
             composable(KAZIS) {
                 KazisScreen(
                     state = kazisState,
                     onSave = viewModel::saveKazisSettings,
                     onFetch = viewModel::fetchKazisMeals,
                     onBackup = viewModel::backupToKazis,
+                    onRestore = viewModel::restoreFromKazis,
                 )
             }
             composable(HEALTH) {

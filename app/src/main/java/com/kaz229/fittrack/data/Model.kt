@@ -22,7 +22,10 @@ enum class SessionKind(val id: String, val label: String) {
  * [activityId] renvoie au catalogue [Activities]. Les calories brûlées sont figées
  * à l'enregistrement (formule MET) pour que l'historique reste stable si le poids change.
  */
-@Entity(tableName = "sessions")
+@Entity(
+    tableName = "sessions",
+    indices = [Index(value = ["externalId"], unique = true)],
+)
 data class Session(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val kind: String,
@@ -32,6 +35,11 @@ data class Session(
     val caloriesBurned: Int = 0,
     val note: String = "",
     val finished: Boolean = false,
+    /**
+     * Identifiant Health Connect quand la séance vient d'une autre application.
+     * L'index unique empêche de la réimporter à chaque synchronisation.
+     */
+    val externalId: String? = null,
 )
 
 /**
