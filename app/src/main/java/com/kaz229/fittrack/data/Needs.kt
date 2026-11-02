@@ -133,7 +133,7 @@ fun computeNeeds(profile: NeedsProfile, weightKg: Double): Needs? {
         trainingKcal = trainingKcal.roundToInt(),
         maintenance = maintenance.roundToInt(),
         target = target,
-        macros = macrosFor(profile.goal, weightKg, target),
+        macros = macrosFor(profile.goal, weightKg, profile.heightCm, target),
         weeklyDeficit = deficit * 7,
         achievableWeeklyLossKg = if (deficit > 0) deficit * 7 / KCAL_PER_KG else 0.0,
         cappedByFloor = profile.goal == Goal.LOSE && wanted < floor,
@@ -144,27 +144,51 @@ private fun metKcal(intensity: Intensity, minutes: Int, weightKg: Double): Doubl
     intensity.met * 3.5 * weightKg / 200.0 * minutes
 
 /**
- * Protéines et lipides d'abord, glucides avec ce qui reste.
+ * Poids sur lequel asseoir les besoins en protéines.
  *
- * Les protéines se calent sur le poids (plus hautes en perte, pour garder le muscle),
- * les lipides sur un plancher hormonal, et les glucides absorbent le solde — ce sont
- * eux qui bougent quand l'objectif change.
+ * Les rapporter au poids total donne des quantités intenables dès qu'il y a du surpoids :
+ * la masse grasse n'a pas de besoin protéique. La référence est donc plafonnée au poids
+ * d'un IMC de 25, majoré de 15 % pour ne pas pénaliser une vraie masse musculaire.
  */
-private fun macrosFor(goal: Goal, weightKg: Double, target: Int): MacroGoals {
+private fun referenceWeight(weightKg: Double, heightCm: Int): Double {
+    if (heightCm <= 0) return weightKg
+    val meters = heightCm / 100.0
+    return minOf(weightKg, 25.0 * meters * meters * 1.15)
+}
+
+/**
+ * Protéines d'abord, lipides en part des calories, glucides avec ce qui reste.
+ *
+ * Les lipides sont une **proportion** de l'objectif, pas un montant par kilo : à poids
+ * élevé, 0,9 g/kg dépassait 40 % des calories et ne laissait presque rien aux glucides.
+ * Un plancher les empêche de tomber trop bas quand l'objectif est serré.
+ */
+private fun macrosFor(goal: Goal, weightKg: Double, heightCm: Int, target: Int): MacroGoals {
+    val reference = referenceWeight(weightKg, heightCm)
     val proteinPerKg = when (goal) {
-        Goal.LOSE -> 2.2
+        Goal.LOSE -> 2.0
         Goal.GAIN -> 1.8
-        Goal.MAINTAIN -> 1.8
+        Goal.MAINTAIN -> 1.6
     }
-    val protein = (weightKg * proteinPerKg).roundToInt()
-    val fat = (weightKg * 0.9).roundToInt()
+    val protein = (reference * proteinPerKg).roundToInt()
+
+    // 28 % des calories en lipides : la part basse de ce qui se recommande couramment,
+    // sans descendre sous le seuil hormonal de 0,6 g par kilo de référence.
+    val fatFloor = (reference * 0.6).roundToInt()
+    val fat = maxOf((target * 0.28 / 9).roundToInt(), fatFloor)
+
     val remaining = target - protein * 4 - fat * 9
-    // Jamais de glucides négatifs : sur un objectif très bas, on rogne les lipides
-    val carbs = if (remaining >= 0) {
-        remaining / 4
-    } else {
-        0
+    if (remaining >= 0) {
+        return MacroGoals(proteinG = protein, carbsG = remaining / 4, fatG = fat)
     }
-    val adjustedFat = if (remaining >= 0) fat else ((target - protein * 4) / 9).coerceAtLeast(0)
-    return MacroGoals(proteinG = protein, carbsG = carbs, fatG = adjustedFat)
+    // Objectif trop serré pour les deux : on rogne les lipides jusqu'à leur plancher,
+    // puis les protéines, pour garder des glucides utilisables.
+    val reducedFat = maxOf(((target - protein * 4) / 9), fatFloor / 2).coerceAtLeast(0)
+    val leftover = target - protein * 4 - reducedFat * 9
+    return if (leftover >= 0) {
+        MacroGoals(proteinG = protein, carbsG = leftover / 4, fatG = reducedFat)
+    } else {
+        val reducedProtein = ((target - reducedFat * 9) / 4).coerceAtLeast(0)
+        MacroGoals(proteinG = reducedProtein, carbsG = 0, fatG = reducedFat)
+    }
 }
