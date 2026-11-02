@@ -146,7 +146,9 @@ fun HealthConnectScreen(
         Text(
             text = "Les séances enregistrées par une autre application (Lyfta, une montre…) " +
                 "sont reprises dans ton historique, sans doublon : chacune garde son " +
-                "identifiant d'origine.",
+                "identifiant d'origine. Quand la même séance arrive deux fois — Lyfta la " +
+                "relaie sur Strava, qui l'écrit à son tour — seule celle de l'application " +
+                "où elle a été saisie est gardée.",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
