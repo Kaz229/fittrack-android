@@ -353,6 +353,42 @@ class FitTrackRepository(
         healthConnect?.hasAllPermissions() ?: false
 
     /**
+     * Reprend les séances enregistrées par d'autres applications (Lyfta, montre…).
+     *
+     * Les calories ne sont pas recalculées : celles de l'application d'origine valent
+     * mieux qu'une estimation MET faite sur une durée seule. Quand elle n'en donne pas,
+     * on retombe sur la formule MET, comme pour une séance saisie ici.
+     */
+    suspend fun importHealthSessions(today: LocalDate = LocalDate.now()): Int {
+        val manager = healthConnect ?: return 0
+        val known = sessionDao.importedExternalIds().toSet()
+        val weight = userPreferences.profile.first().weightKg
+        var imported = 0
+        for (session in manager.foreignSessions(today, SYNC_DAYS)) {
+            if (session.id in known) continue
+            val activity = if (session.isStrength) {
+                Activities.strengthTraining
+            } else {
+                Activities.byId("autre")
+            }
+            sessionDao.insert(
+                Session(
+                    kind = if (session.isStrength) SessionKind.GYM.id else SessionKind.CARDIO.id,
+                    epochDay = session.day.toEpochDay(),
+                    activityId = if (session.isStrength) null else activity.id,
+                    durationMinutes = session.minutes,
+                    caloriesBurned = Activities.caloriesBurned(activity, session.minutes, weight),
+                    note = session.title ?: "Importé de ${session.source.substringAfterLast('.')}",
+                    finished = true,
+                    externalId = session.id,
+                ),
+            )
+            imported++
+        }
+        return imported
+    }
+
+    /**
      * Exporte les séances et repas du dernier mois, et relit le poids le plus récent.
      * Le poids n'est pas appliqué d'office : il est renvoyé pour que l'utilisateur
      * décide de remplacer, ou non, celui de son profil.
@@ -368,6 +404,8 @@ class FitTrackRepository(
         )
         if (result is SyncResult.Success) {
             userPreferences.setLastHealthSync(System.currentTimeMillis() / 1000)
+            // Dans la foulée : ce que les autres applications ont écrit de leur côté
+            return result.copy(imported = importHealthSessions(today))
         }
         return result
     }

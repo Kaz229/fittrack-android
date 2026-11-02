@@ -36,6 +36,10 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY id")
     suspend fun all(): List<Session>
 
+    /** Les identifiants Health Connect déjà importés, pour ne pas les reprendre. */
+    @Query("SELECT externalId FROM sessions WHERE externalId IS NOT NULL")
+    suspend fun importedExternalIds(): List<String>
+
     /** Réécrit les séances d'une restauration, identifiants d'origine compris. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(sessions: List<Session>)

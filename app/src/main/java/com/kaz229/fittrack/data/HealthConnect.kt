@@ -36,9 +36,30 @@ enum class HealthConnectAvailability {
     UNSUPPORTED,
 }
 
+/** Une séance écrite dans Health Connect par une autre application. */
+data class ForeignSession(
+    val id: String,
+    val title: String?,
+    val exerciseType: Int,
+    val source: String,
+    val start: java.time.Instant,
+    val minutes: Int,
+    val day: LocalDate,
+) {
+    /** Musculation ou cardio, selon le type déclaré par l'application d'origine. */
+    val isStrength: Boolean
+        get() = exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING ||
+            exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING
+}
+
 /** Résultat d'une synchronisation, pour l'afficher sans interpréter une exception. */
 sealed interface SyncResult {
-    data class Success(val sessions: Int, val meals: Int, val weightKg: Double?) : SyncResult
+    data class Success(
+        val sessions: Int,
+        val meals: Int,
+        val weightKg: Double?,
+        val imported: Int = 0,
+    ) : SyncResult
     data object PermissionsMissing : SyncResult
     data object Unavailable : SyncResult
     data class Failed(val message: String) : SyncResult
@@ -116,6 +137,45 @@ class HealthConnectManager(private val context: Context) {
         }
     }
 
+    /**
+     * Les séances enregistrées par d'autres applications sur la période.
+     *
+     * Celles que FitTrack a écrites sont écartées : elles viennent d'ici, les réimporter
+     * créerait un doublon à chaque synchronisation.
+     */
+    suspend fun foreignSessions(
+        today: LocalDate = LocalDate.now(),
+        days: Int = 30,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): List<ForeignSession> = withContext(Dispatchers.IO) {
+        val client = client ?: return@withContext emptyList()
+        val from = today.minusDays((days - 1).toLong()).atStartOfDay(zone).toInstant()
+        try {
+            val own = context.packageName
+            client.readRecords(
+                ReadRecordsRequest(
+                    recordType = ExerciseSessionRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(from, Instant.now()),
+                ),
+            ).records
+                .filter { it.metadata.dataOrigin.packageName != own }
+                .map { record ->
+                    ForeignSession(
+                        id = record.metadata.id,
+                        title = record.title?.takeIf { it.isNotBlank() },
+                        exerciseType = record.exerciseType,
+                        source = record.metadata.dataOrigin.packageName,
+                        start = record.startTime,
+                        minutes = Duration.between(record.startTime, record.endTime)
+                            .toMinutes().toInt().coerceAtLeast(1),
+                        day = record.startTime.atZone(zone).toLocalDate(),
+                    )
+                }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     /** Dernier poids enregistré par n'importe quelle application, en kilos. */
     suspend fun latestWeightKg(): Double? = withContext(Dispatchers.IO) {
         val client = client ?: return@withContext null
@@ -143,6 +203,8 @@ class HealthConnectManager(private val context: Context) {
             HealthPermission.getWritePermission(ActiveCaloriesBurnedRecord::class),
             HealthPermission.getWritePermission(NutritionRecord::class),
             HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
         )
 
         /**

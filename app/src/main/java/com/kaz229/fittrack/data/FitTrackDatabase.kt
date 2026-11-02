@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Session::class, ExerciseSet::class, Meal::class, FoodProduct::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class FitTrackDatabase : RoomDatabase() {
@@ -50,12 +50,26 @@ abstract class FitTrackDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v2 → v3 : les séances peuvent venir d'une autre application via Health Connect.
+         * L'index unique sur l'identifiant d'origine empêche les doublons à l'import.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sessions ADD COLUMN externalId TEXT")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_sessions_externalId" +
+                        " ON sessions (externalId)",
+                )
+            }
+        }
+
         fun get(context: Context): FitTrackDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
                 context.applicationContext,
                 FitTrackDatabase::class.java,
                 "fittrack.db",
-            ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
         }
     }
 }
