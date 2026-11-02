@@ -58,7 +58,7 @@ corde à sauter 11,0 · rameur 7,0…). C'est une estimation, pas une mesure mé
 | | |
 |---|---|
 | Langage | Kotlin 2.0 |
-| UI | Jetpack Compose + Material 3 (thème dynamique Android 12+) |
+| UI | Jetpack Compose + Material 3, palette « bento » (clair / sombre au choix) |
 | Navigation | Navigation Compose (4 onglets + écrans de détail) |
 | Base de données | Room (SQLite) |
 | Préférences | DataStore |

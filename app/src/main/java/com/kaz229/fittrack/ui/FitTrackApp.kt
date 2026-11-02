@@ -265,6 +265,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                         viewModel.selectExercise(exercise.id)
                         navController.navigate(EXERCISE_DETAIL)
                     },
+                    showHeader = true,
                 )
             }
             composable(Tab.MEALS.route) {

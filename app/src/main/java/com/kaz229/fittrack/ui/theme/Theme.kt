@@ -40,6 +40,16 @@ object Bento {
     val darkScheme = darkColorScheme(
         primary = AcidGreen,
         onPrimary = DarkBg,
+        // Sans ces rôles, la barre de navigation et les boutons flottants retombent
+        // sur le violet par défaut de Material.
+        primaryContainer = AcidGreen,
+        onPrimaryContainer = DarkBg,
+        secondaryContainer = Color(0xFF2A3300),
+        onSecondaryContainer = AcidGreen,
+        secondary = AcidGreen,
+        onSecondary = DarkBg,
+        tertiary = AcidGreen,
+        onTertiary = DarkBg,
         background = DarkBg,
         onBackground = Color.White,
         surface = DarkCard,
@@ -49,11 +59,28 @@ object Bento {
         outline = DarkBorder,
         outlineVariant = DarkTrack,
         error = Color(0xFFFF6B6B),
+        // La barre de navigation et les surfaces élevées tirent leur fond d'ici ;
+        // sans ces rôles, Material y applique sa teinte violette.
+        surfaceContainer = DarkCard,
+        surfaceContainerLow = DarkCard,
+        surfaceContainerHigh = Color(0xFF1E1E1E),
+        surfaceContainerHighest = Color(0xFF242424),
+        surfaceTint = Color.Transparent,
+        inverseSurface = Color.White,
+        inverseOnSurface = DarkBg,
     )
 
     val lightScheme = lightColorScheme(
         primary = DeepGreen,
         onPrimary = Color.White,
+        primaryContainer = DeepGreen,
+        onPrimaryContainer = Color.White,
+        secondaryContainer = Color(0xFFE4EFC4),
+        onSecondaryContainer = Color(0xFF2E4000),
+        secondary = DeepGreen,
+        onSecondary = Color.White,
+        tertiary = DeepGreen,
+        onTertiary = Color.White,
         background = LightBg,
         onBackground = Color(0xFF121212),
         surface = LightCard,
@@ -63,6 +90,13 @@ object Bento {
         outline = LightBorder,
         outlineVariant = LightTrack,
         error = Color(0xFFB3261E),
+        surfaceContainer = LightCard,
+        surfaceContainerLow = LightCard,
+        surfaceContainerHigh = Color(0xFFF7F7F3),
+        surfaceContainerHighest = Color(0xFFEFEFE9),
+        surfaceTint = Color.Transparent,
+        inverseSurface = Color(0xFF121212),
+        inverseOnSurface = Color.White,
     )
 }
 

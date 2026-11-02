@@ -44,8 +44,21 @@ fun ExercisesScreen(
     onSelect: (Exercise) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 16.dp),
+    showHeader: Boolean = false,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        // L'en-tête n'apparaît que sur l'onglet : la feuille de sélection d'une séance
+        // réutilise cet écran et porte déjà son propre titre.
+        if (showHeader) {
+            Column(modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)) {
+                Text(
+                    text = "Catalogue",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = "Exercices", style = MaterialTheme.typography.headlineMedium)
+            }
+        }
         OutlinedTextField(
             value = state.query,
             onValueChange = onQueryChange,
@@ -73,7 +86,8 @@ fun ExercisesScreen(
                 state.loading -> "Chargement du catalogue…"
                 else -> "${state.exercises.size} exercice(s)"
             },
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         if (state.loading) {
