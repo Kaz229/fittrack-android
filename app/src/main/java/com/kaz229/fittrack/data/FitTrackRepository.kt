@@ -402,10 +402,22 @@ class FitTrackRepository(
      */
     suspend fun importHealthSessions(today: LocalDate = LocalDate.now()): Int {
         val manager = healthConnect ?: return 0
+        val foreign = manager.foreignSessions(today, SYNC_DAYS)
+
+        // Une séance importée qui n'est plus dans la liste n'a plus lieu d'être : soit
+        // elle a été supprimée à la source, soit c'était le doublon relayé par une autre
+        // application. Les séances saisies ici n'ont pas d'identifiant externe et ne sont
+        // jamais touchées.
+        val fromDay = today.minusDays((SYNC_DAYS - 1).toLong()).toEpochDay()
+        val stillThere = foreign.map { it.id }.toSet()
+        for (session in sessionDao.importedSince(fromDay)) {
+            if (session.externalId !in stillThere) sessionDao.delete(session)
+        }
+
         val known = sessionDao.importedExternalIds().toSet()
         val weight = userPreferences.profile.first().weightKg
         var imported = 0
-        for (session in manager.foreignSessions(today, SYNC_DAYS)) {
+        for (session in foreign) {
             if (session.id in known) continue
             val activity = if (session.isStrength) {
                 Activities.strengthTraining

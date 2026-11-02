@@ -45,11 +45,22 @@ data class ForeignSession(
     val start: java.time.Instant,
     val minutes: Int,
     val day: LocalDate,
+    val end: java.time.Instant,
 ) {
     /** Musculation ou cardio, selon le type déclaré par l'application d'origine. */
     val isStrength: Boolean
         get() = exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING ||
             exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING
+
+    /** Deux séances qui se recouvrent dans le temps décrivent le même entraînement. */
+    fun overlaps(other: ForeignSession): Boolean = start < other.end && other.start < end
+
+    /** Entre deux doublons : l'application préférée, puis la séance la plus longue. */
+    fun preferredOver(other: ForeignSession): Boolean {
+        val mine = HealthConnectManager.rankOf(source)
+        val theirs = HealthConnectManager.rankOf(other.source)
+        return if (mine != theirs) mine < theirs else minutes > other.minutes
+    }
 }
 
 /** Résultat d'une synchronisation, pour l'afficher sans interpréter une exception. */
@@ -169,8 +180,10 @@ class HealthConnectManager(private val context: Context) {
                         minutes = Duration.between(record.startTime, record.endTime)
                             .toMinutes().toInt().coerceAtLeast(1),
                         day = record.startTime.atZone(zone).toLocalDate(),
+                        end = record.endTime,
                     )
                 }
+                .let(::dropDuplicates)
         } catch (_: Exception) {
             emptyList()
         }
@@ -382,6 +395,42 @@ class HealthConnectManager(private val context: Context) {
             } else {
                 dateTime.minusMinutes(overflow.toMinutes() + 1)
             }
+        }
+
+        /**
+         * Applications préférées quand une même séance arrive deux fois, la première
+         * l'emportant.
+         *
+         * Le cas vient des passerelles : une séance faite dans Lyfta part sur Strava,
+         * qui l'écrit à son tour dans Health Connect. Les deux décrivent le même
+         * entraînement ; celle de l'application où il a été saisi est la plus fidèle.
+         */
+        val PREFERRED_SOURCES = listOf("lyfta", "strava")
+
+        /**
+         * Écarte les séances qui en recouvrent une autre.
+         *
+         * Deux enregistrements qui se chevauchent dans le temps décrivent le même
+         * entraînement : on ne garde que celui de l'application la mieux placée, et à
+         * défaut le plus long, qui porte en général le plus de détail.
+         */
+        fun dropDuplicates(sessions: List<ForeignSession>): List<ForeignSession> {
+            val kept = mutableListOf<ForeignSession>()
+            for (session in sessions.sortedBy { it.start }) {
+                val rival = kept.indexOfFirst { it.overlaps(session) }
+                if (rival < 0) {
+                    kept += session
+                } else if (session.preferredOver(kept[rival])) {
+                    kept[rival] = session
+                }
+            }
+            return kept
+        }
+
+        fun rankOf(source: String): Int {
+            val index = PREFERRED_SOURCES.indexOfFirst { source.contains(it, ignoreCase = true) }
+            // Une application inconnue passe après celles qu'on sait préférer
+            return if (index < 0) PREFERRED_SOURCES.size else index
         }
 
         /** Décalage horaire d'un instant local, exposé pour les tests. */

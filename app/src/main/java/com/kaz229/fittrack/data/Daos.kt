@@ -40,6 +40,10 @@ interface SessionDao {
     @Query("SELECT externalId FROM sessions WHERE externalId IS NOT NULL")
     suspend fun importedExternalIds(): List<String>
 
+    /** Les séances importées d'une période, pour repérer celles qui n'ont plus lieu d'être. */
+    @Query("SELECT * FROM sessions WHERE externalId IS NOT NULL AND epochDay >= :fromDay")
+    suspend fun importedSince(fromDay: Long): List<Session>
+
     /** Réécrit les séances d'une restauration, identifiants d'origine compris. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(sessions: List<Session>)

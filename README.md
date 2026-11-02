@@ -30,7 +30,9 @@ Rien d'autre ne sort du téléphone, et les deux restent facultatifs.
 - **Séance oubliée** : au bout de 10 minutes sans nouvelle série, l'app demande si tu es
   toujours là — une séance laissée ouverte fausse sa durée et ses calories.
 - **Séances venues d'ailleurs** : celles enregistrées dans une autre application (Lyfta, une
-  montre) sont reprises depuis Health Connect, sans doublon.
+  montre) sont reprises depuis Health Connect. Quand la même séance arrive deux fois — Lyfta
+  la relaie sur Strava, qui l'écrit à son tour — seule celle de l'application où elle a été
+  saisie est gardée.
 - **Repas au code-barres** : on scanne le produit, l'app récupère ses valeurs nutritionnelles chez
   Open Food Facts, on saisit la quantité en grammes et l'apport est calculé au prorata —
   calories, protéines, glucides, lipides.
