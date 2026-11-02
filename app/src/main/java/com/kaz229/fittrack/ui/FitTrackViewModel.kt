@@ -10,12 +10,13 @@ import com.kaz229.fittrack.data.ExerciseCatalog
 import com.kaz229.fittrack.data.ExerciseSet
 import com.kaz229.fittrack.data.FitTrackRepository
 import com.kaz229.fittrack.data.FoodLookup
+import com.kaz229.fittrack.data.FoodProduct
+import com.kaz229.fittrack.data.FoodSearch
 import com.kaz229.fittrack.data.HealthConnectAvailability
 import com.kaz229.fittrack.data.KazisBackup
 import com.kaz229.fittrack.data.KazisFetch
 import com.kaz229.fittrack.data.KazisRestore
 import com.kaz229.fittrack.data.KazisSettings
-import com.kaz229.fittrack.data.FoodProduct
 import com.kaz229.fittrack.data.Labels
 import com.kaz229.fittrack.data.MacroGoals
 import com.kaz229.fittrack.data.MacroTotals
@@ -25,6 +26,8 @@ import com.kaz229.fittrack.data.Session
 import com.kaz229.fittrack.data.SyncResult
 import com.kaz229.fittrack.data.UserProfile
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +49,16 @@ data class CatalogState(
     val equipment: String? = null,
     val loading: Boolean = true,
 )
+
+/** Ce que l'écran de recherche d'aliments affiche. */
+data class FoodSearchState(
+    val query: String = "",
+    val searching: Boolean = false,
+    val history: List<Meal> = emptyList(),
+    val products: List<FoodProduct> = emptyList(),
+) {
+    val isEmpty: Boolean get() = history.isEmpty() && products.isEmpty()
+}
 
 /** Ce que l'écran « repas dictés » doit afficher. */
 data class KazisState(
@@ -227,6 +240,48 @@ class FitTrackViewModel(application: Application) : AndroidViewModel(application
         val product = _scan.value.product ?: return@launch
         repository.addFoodMeal(product, grams, mealType, today)
         _scan.value = ScanState()
+    }
+
+    // --- Recherche d'aliments ------------------------------------------------
+
+    private val foodQuery = MutableStateFlow("")
+    private val foodSearching = MutableStateFlow(false)
+    private val foodResults = MutableStateFlow(FoodSearch())
+
+    val foodSearch: StateFlow<FoodSearchState> = combine(
+        foodQuery,
+        foodSearching,
+        foodResults,
+    ) { query, searching, results ->
+        FoodSearchState(query, searching, results.history, results.products)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FoodSearchState())
+
+    private var searchJob: Job? = null
+
+    fun onFoodQueryChange(value: String) {
+        foodQuery.value = value
+        searchJob?.cancel()
+        if (value.trim().length < 2) {
+            foodResults.value = FoodSearch()
+            foodSearching.value = false
+            return
+        }
+        searchJob = viewModelScope.launch {
+            // Laisser finir la frappe : sans cela, chaque lettre partirait en requête
+            delay(350)
+            foodSearching.value = true
+            foodResults.value = repository.searchFoods(value)
+            foodSearching.value = false
+        }
+    }
+
+    fun repeatMeal(meal: Meal, mealType: MealType) = viewModelScope.launch {
+        repository.repeatMeal(meal, mealType, today)
+    }
+
+    /** Un produit choisi dans la recherche rejoint l'écran de pesée, comme après un scan. */
+    fun selectSearchedProduct(product: FoodProduct) {
+        _scan.value = ScanState(barcode = product.barcode, product = product, fromCache = true)
     }
 
     // --- Repas dictés à Kazis ------------------------------------------------

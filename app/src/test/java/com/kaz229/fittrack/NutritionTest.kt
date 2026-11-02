@@ -136,6 +136,48 @@ class NutritionTest {
     }
 
     @Test
+    fun `une recherche rend les produits avec leurs valeurs`() {
+        val json = """
+            {"hits": [
+              {"code": "4316268627979", "product_name": "Skyr nature", "brands": ["Lidl"],
+               "nutriments": {"energy-kcal_100g": 65, "proteins_100g": 10.6,
+                              "carbohydrates_100g": 4.4, "fat_100g": 0.2}},
+              {"code": "8710624358174", "product_name": "Skyr vanille", "brands": ["Arla"],
+               "nutriments": {"energy-kcal_100g": 85, "proteins_100g": 9.0,
+                              "carbohydrates_100g": 10.0, "fat_100g": 0.2}}
+            ]}
+        """.trimIndent()
+
+        val produits = OpenFoodFactsClient.parseSearch(json)
+
+        assertEquals(listOf("Skyr nature", "Skyr vanille"), produits.map { it.name })
+        // « brands » est un tableau ici, une chaîne dans la recherche par code-barres
+        assertEquals("Lidl", produits.first().brands)
+        assertEquals(65.0, produits.first().kcalPer100g, 0.001)
+        assertEquals(10.6, produits.first().proteinPer100g, 0.001)
+    }
+
+    @Test
+    fun `un resultat sans calories ou sans nom est ecarte`() {
+        val json = """
+            {"hits": [
+              {"code": "1", "product_name": "Sans calories", "nutriments": {"proteins_100g": 5}},
+              {"code": "2", "nutriments": {"energy-kcal_100g": 100}},
+              {"code": "3", "product_name": "Complet", "nutriments": {"energy-kcal_100g": 100}}
+            ]}
+        """.trimIndent()
+
+        // Un produit sans calories n'apporte rien au journal : autant ne pas le proposer
+        assertEquals(listOf("Complet"), OpenFoodFactsClient.parseSearch(json).map { it.name })
+    }
+
+    @Test
+    fun `une recherche sans resultat ne rend rien`() {
+        assertTrue(OpenFoodFactsClient.parseSearch("""{"hits": []}""").isEmpty())
+        assertTrue(OpenFoodFactsClient.parseSearch("{}").isEmpty())
+    }
+
+    @Test
     fun `le nom affiche ne repete pas la marque`() {
         assertEquals("Nutella", nutella.copy(brands = "Nutella").displayName)
         assertEquals("Nutella — Ferrero", nutella.displayName)

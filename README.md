@@ -34,6 +34,9 @@ Rien d'autre ne sort du téléphone, et les deux restent facultatifs.
 - **Repas au code-barres** : on scanne le produit, l'app récupère ses valeurs nutritionnelles chez
   Open Food Facts, on saisit la quantité en grammes et l'apport est calculé au prorata —
   calories, protéines, glucides, lipides.
+- **Recherche par nom** : « sky » retrouve le skyr mangé il y a deux jours, à réinscrire en un
+  tap, puis propose les produits d'Open Food Facts. L'historique passe devant : on remange
+  surtout les mêmes choses, et il répond sans réseau.
 - **Saisie libre** : pour la cuisine maison ou un produit absent de la base, avec macros optionnelles.
 - **Accueil** : bilan calorique du jour (ingéré / brûlé / net), macros face aux objectifs, volume
   soulevé, progression vers l'objectif, historique des 7 derniers jours.

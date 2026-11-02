@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
@@ -53,6 +54,7 @@ import com.kaz229.fittrack.ui.screens.AddCardioDialog
 import com.kaz229.fittrack.ui.screens.AddMealDialog
 import com.kaz229.fittrack.ui.screens.ExerciseDetailScreen
 import com.kaz229.fittrack.ui.screens.ExercisesScreen
+import com.kaz229.fittrack.ui.screens.FoodSearchScreen
 import com.kaz229.fittrack.ui.screens.HealthConnectScreen
 import com.kaz229.fittrack.ui.screens.HomeScreen
 import com.kaz229.fittrack.ui.screens.KazisScreen
@@ -80,6 +82,7 @@ private const val PROFILE = "profile"
 private const val SCAN = "scan"
 private const val HEALTH = "health"
 private const val KAZIS = "kazis"
+private const val FOOD_SEARCH = "food-search"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +120,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
     val scanState by viewModel.scan.collectAsStateWithLifecycle()
     val healthState by viewModel.health.collectAsStateWithLifecycle()
     val kazisState by viewModel.kazis.collectAsStateWithLifecycle()
+    val foodSearchState by viewModel.foodSearch.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val exercisesById by viewModel.exercisesById.collectAsStateWithLifecycle()
     val openSession by viewModel.openSession.collectAsStateWithLifecycle()
@@ -131,6 +135,7 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
         SCAN -> "Scanner un produit"
         HEALTH -> "Health Connect"
         KAZIS -> "Repas dictés"
+        FOOD_SEARCH -> "Chercher un aliment"
         else -> currentTab?.label ?: "FitTrack"
     }
 
@@ -201,6 +206,14 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     SmallFloatingActionButton(onClick = { showMealDialog = true }) {
                         Icon(Icons.Filled.Add, contentDescription = "Saisir un aliment à la main")
                     }
+                    SmallFloatingActionButton(
+                        onClick = {
+                            viewModel.onFoodQueryChange("")
+                            navController.navigate(FOOD_SEARCH)
+                        },
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = "Chercher un aliment")
+                    }
                     ExtendedFloatingActionButton(
                         onClick = {
                             viewModel.resetScan()
@@ -257,6 +270,20 @@ fun FitTrackApp(viewModel: FitTrackViewModel = viewModel()) {
                     macros = macros,
                     macroGoals = profile.macroGoals,
                     onDelete = viewModel::deleteMeal,
+                )
+            }
+            composable(FOOD_SEARCH) {
+                FoodSearchScreen(
+                    state = foodSearchState,
+                    onQueryChange = viewModel::onFoodQueryChange,
+                    onRepeat = { meal, mealType ->
+                        viewModel.repeatMeal(meal, mealType)
+                        navController.popBackStack()
+                    },
+                    onPickProduct = { product ->
+                        viewModel.selectSearchedProduct(product)
+                        navController.navigate(SCAN)
+                    },
                 )
             }
             composable(KAZIS) {

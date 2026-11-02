@@ -116,6 +116,18 @@ interface MealDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(meals: List<Meal>)
 
+    /**
+     * Les aliments déjà saisis qui correspondent à la recherche, le plus récent d'abord.
+     *
+     * Un même aliment revenant souvent, on ne garde que sa dernière version : c'est
+     * celle dont la quantité et les macros sont les plus à jour.
+     */
+    @Query(
+        "SELECT * FROM meals WHERE name LIKE '%' || :query || '%' " +
+            "GROUP BY LOWER(name) HAVING id = MAX(id) ORDER BY id DESC LIMIT :limit",
+    )
+    suspend fun searchHistory(query: String, limit: Int = 8): List<Meal>
+
     @Query("SELECT COALESCE(SUM(calories), 0) FROM meals WHERE epochDay = :epochDay")
     fun observeCaloriesForDay(epochDay: Long): Flow<Int>
 
@@ -143,4 +155,11 @@ interface FoodProductDao {
 
     @Query("SELECT * FROM food_products WHERE barcode = :barcode")
     suspend fun findByBarcode(barcode: String): FoodProduct?
+
+    /** Produits déjà scannés qui correspondent à la recherche : disponibles hors ligne. */
+    @Query(
+        "SELECT * FROM food_products WHERE name LIKE '%' || :query || '%' " +
+            "OR brands LIKE '%' || :query || '%' ORDER BY fetchedAtEpochDay DESC LIMIT :limit",
+    )
+    suspend fun search(query: String, limit: Int = 8): List<FoodProduct>
 }

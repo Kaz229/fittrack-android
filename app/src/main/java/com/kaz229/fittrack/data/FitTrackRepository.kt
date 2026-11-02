@@ -160,6 +160,33 @@ class FitTrackRepository(
 
     suspend fun deleteMeal(meal: Meal) = mealDao.delete(meal)
 
+    /** Réinscrit un aliment déjà saisi, à la date du jour et au repas choisi. */
+    suspend fun repeatMeal(meal: Meal, mealType: MealType, date: LocalDate = LocalDate.now()) {
+        mealDao.insert(
+            meal.copy(id = 0, mealType = mealType.id, epochDay = date.toEpochDay()),
+        )
+    }
+
+    // --- Recherche d'aliments ------------------------------------------------
+
+    /**
+     * Ce que la recherche propose : d'abord ce qui est déjà connu du téléphone,
+     * ensuite seulement ce qu'Open Food Facts renvoie.
+     *
+     * L'historique passe devant parce qu'on remange surtout les mêmes choses, et qu'il
+     * répond sans réseau. Les deux listes sont rendues séparément : recopier un repas
+     * déjà saisi et peser un produit ne sont pas le même geste.
+     */
+    suspend fun searchFoods(query: String): FoodSearch {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) return FoodSearch()
+        val history = mealDao.searchHistory(trimmed)
+        val cached = foodProductDao.search(trimmed)
+        val remote = openFoodFacts.search(trimmed)
+            .filter { product -> cached.none { it.barcode == product.barcode } }
+        return FoodSearch(history = history, products = cached + remote)
+    }
+
     // --- Aliments scannés ----------------------------------------------------
 
     /**
